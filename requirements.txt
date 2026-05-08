@@ -17,3 +17,4 @@ numpy==1.26.2
 # Visualization & Utilities
 matplotlib==3.8.2
 werkzeug==3.0.1
+Flask-Mail

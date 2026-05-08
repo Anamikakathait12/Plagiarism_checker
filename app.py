@@ -20,12 +20,24 @@ from werkzeug.security import check_password_hash
 from utils import calculate_similarity
 from database import init_db, get_db_connection, register_user
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, flash
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 
 #  🚀  Configure Gemini (Paste your API key here!)
 genai.configure(api_key="AIzaSyAoSqxPA9BxB-TN6YYrcugk7z65T-5nMjM")
 
 app = Flask(__name__)
 app.secret_key = "secret123"
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'designstudioofficials@gmail.com'
+app.config['MAIL_PASSWORD'] = 'ekye nruf fdqt korn'
+app.config['MAIL_DEFAULT_SENDER'] = 'designstudioofficials@gmail.com'
+
+mail = Mail(app)
+s = URLSafeTimedSerializer(app.secret_key)
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -215,10 +227,31 @@ def register():
     email = request.form.get('email')
     password = request.form.get('password')
     role = request.form.get('role')
+
+    # Register the user in DB (Make sure your register_user function 
+    # in database.py handles the password hashing and inserts into DB)
     success = register_user(username, email, password, role)
-    template = 'student-login.html' if role == 'student' else 'teacher-login.html'
-    if success: return render_template(template, success="Account created! You can now log in.")
-    else: return render_template(template, error="Registration failed. Username or Email already taken.")
+    
+    if success:
+        # Generate the unique token linked to the email
+        token = s.dumps(email, salt='email-confirm')
+        
+        # Build the absolute URL for the verification link
+        link = url_for('confirm_email', token=token, _external=True)
+        
+        # Compose the email
+        msg = Message('Verify Your Account - Plagiarism Checker', recipients=[email])
+        msg.body = f'Hi {username}, please click the link to verify your account: {link}'
+        
+        try:
+            mail.send(msg)
+            template = 'student-login.html' if role == 'student' else 'teacher-login.html'
+            return render_template(template, success="Verification email sent! Please check your inbox.")
+        except Exception as e:
+            print(f"Mail Error: {e}")
+            return "Email could not be sent. Please check your Gmail configuration."
+
+    return "Registration failed. Email might already be in use."
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -235,6 +268,24 @@ def login():
         login_user(user_obj)
         return redirect(url_for('student_portal')) if role == 'student' else redirect(url_for('teacher_portal'))
     return render_template(template, error="Invalid Username/Email or Password.")
+
+@app.route('/confirm_email/<token>')
+def confirm_email(token):
+    try:
+        # The link expires in 3600 seconds (1 hour)
+        email = s.loads(token, salt='email-confirm', max_age=3600)
+    except SignatureExpired:
+        return '<h1>Link expired. Please register again.</h1>'
+    except:
+        return '<h1>Invalid Token.</h1>'
+    
+    # Update the user in the database
+    conn = get_db_connection()
+    conn.execute('UPDATE users SET is_verified = 1 WHERE email = ?', (email,))
+    conn.commit()
+    conn.close()
+    
+    return '<h1>Email verified! You can now log in.</h1>'
 
 @app.route('/logout')
 @login_required
