@@ -1,0 +1,29 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Database (Local SQLite file)
+# It is best practice to let the user generate their own DB locally
+database.db
+
+# User Uploads
+# Do not upload student submissions to GitHub
+uploads/*
+!uploads/.gitkeep
+
+# IDE Settings
+.vscode/
+.idea/
+
+# Environment Variables (if you use them for API keys)
+.env
+
+# OS-specific files
+.DS_Store
+Thumbs.db
