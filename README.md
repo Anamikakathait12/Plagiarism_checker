@@ -1,5 +1,6 @@
 PlagiarismGuard: A Triple-Layer Academic Integrity SystemPlagiarismGuard is a centralized Learning Management System (LMS) designed to automate academic integrity checks. Unlike traditional scanners, it utilizes a hybrid triple-layer engine to detect unoriginal content from the live web, peer-to-peer collusion, and historical institution-wide databases. 
-🚀 Core Features
+
+🚀Core Features
 Layer 1: External Internet Validation: Utilizes the Tavily Search API to bypass search engine bot-protections and retrieve live source material.  
 Layer 2: Internal Peer-to-Peer Matrix: Executes a recursive Ratcliff/Obershelp (Gestalt) algorithm to detect $O(N^2)$ collusion within localized student batches. 
 Layer 3: Global Historical Fingerprinting: Implements the Winnowing algorithm to create cryptographic $K$-gram fingerprints, enabling high-speed $O(1)$ intersection lookups across all historical submissions.
