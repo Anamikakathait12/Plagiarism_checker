@@ -27,10 +27,12 @@ Accuracy: Validates that the Gestalt algorithm successfully identifies "scramble
    git clone https://github.com/Anamikakathait12/Plagiarism_checker.git
    cd Plagiarism_checker
 2. Install Dependencies:
-   Ensure you have Python 3.10+ installed.Bashpip install -r requirements.txt
-3. Environment Configuration:
-Ensure your API keys for Google Gemini and Tavily are updated in the configuration section of app.py.
-4. Run the Application:
+   Ensure you have Python 3.10+
+   installed.Bash
+   pip install -r requirements.txt
+4. Environment Configuration:
+   Ensure your API keys for Google Gemini and Tavily are updated in the configuration section of app.py.
+5. Run the Application:
    Bash
    python app.py
    Access the portal at http://127.0.0.1:5000.
