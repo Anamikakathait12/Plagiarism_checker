@@ -521,7 +521,7 @@ def delete_task(task_id):
 def join_course():
     if current_user.role != 'student': return redirect(url_for('index'))
     
-    code = request.form.get('invite_code').strip().upper()
+    code = request.form.get('invite_code', '').strip().upper()
     conn = get_db_connection()
     course = conn.execute('SELECT id FROM courses WHERE code = ?', (code,)).fetchone()
     
