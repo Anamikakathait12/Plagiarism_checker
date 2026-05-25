@@ -140,8 +140,13 @@ The project includes two standalone research scripts:
 
 ```bash
 python algorithm_comparison.py      # Compares Jaccard, Cosine, Gestalt, Winnowing
+
+
 python time_complexity_benchmark.py # Benchmarks O(N²) vs O(N) scalability
 ```
+<img width="3600" height="2100" alt="algorithm_comparison_graph" src="https://github.com/user-attachments/assets/2ae1ee50-94d5-4b47-bb92-c92df2c8bd6b" />
+<img width="3000" height="1800" alt="updated_time_complexity_graph" src="https://github.com/user-attachments/assets/346a3f3e-b063-42a2-8e33-cadaac3248d9" />
+
 
 ---
 
@@ -159,9 +164,12 @@ python time_complexity_benchmark.py # Benchmarks O(N²) vs O(N) scalability
 ## 📸 Screenshots
 
 > _Add screenshots of your Teacher Dashboard, Internet Plagiarism Report, and Side-by-Side Comparison here._
-Screenshots/Teacher Dashboard.png
-Screenshots/Internet.png
-Screenshots/Side by side.png
+<img width="1860" height="887" alt="Teacher Dashboard" src="https://github.com/user-attachments/assets/b223381b-caa5-4bf7-b7b4-e49f780533b7" />
+
+<img width="880" height="916" alt="Internet" src="https://github.com/user-attachments/assets/b8bb6a56-e2cb-48e4-adf1-977386360d28" />
+
+<img width="1217" height="643" alt="Side by side" src="https://github.com/user-attachments/assets/90fe7869-5fa4-4d94-834f-c8fad333770b" />
+
 
 ---
 
