@@ -1,25 +1,13 @@
-# Web framework
-flask>=3.0
-flask-login>=0.6
-flask-mail>=0.10
-itsdangerous>=2.1
-
-# Environment / config
-python-dotenv>=1.0
-
-# Document parsing
-PyPDF2>=3.0
-python-docx>=1.1
-werkzeug>=3.0
-
-# ML / NLP
-sentence-transformers>=2.7
-scikit-learn>=1.4
-numpy>=1.26
-
-# AI APIs
-google-genai>=1.0
-requests>=2.31
-
-# Web scraping (used by BeautifulSoup in original; keep if templates use it)
-beautifulsoup4>=4.12
+flask
+flask-login
+werkzeug
+requests
+beautifulsoup4
+PyPDF2
+python-docx
+google-generativeai
+numpy
+scikit-learn
+matplotlib
+sentence-transformers
+ 
