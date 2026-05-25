@@ -159,7 +159,9 @@ python time_complexity_benchmark.py # Benchmarks O(N²) vs O(N) scalability
 ## 📸 Screenshots
 
 > _Add screenshots of your Teacher Dashboard, Internet Plagiarism Report, and Side-by-Side Comparison here._
-
+Screenshots/Teacher Dashboard.png
+Screenshots/Internet.png
+Screenshots/Side by side.png
 
 ---
 
