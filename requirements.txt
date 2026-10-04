@@ -1,0 +1,14 @@
+Flask>=3.0,<4
+Flask-Login==0.6.3
+python-dotenv>=1.0
+PyPDF2==3.0.1
+python-docx>=1.1
+requests>=2.31
+beautifulsoup4>=4.12
+scikit-learn>=1.4
+sentence-transformers>=2.7
+google-genai>=0.3
+
+# Only needed to regenerate the benchmark graphs in scripts/
+matplotlib>=3.8
+numpy>=1.26

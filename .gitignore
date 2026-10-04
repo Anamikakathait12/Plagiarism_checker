@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Runtime data (student documents + database) must never be committed
+instance/*
+!instance/.gitkeep
+!instance/uploads/
+instance/uploads/*
+!instance/uploads/.gitkeep
+*.db
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
