@@ -1,5 +1,12 @@
 # PlagiarismGuard
-
+---
+title: PlagiarismGuard
+emoji: 📄
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
 A web app where teachers create courses and assignments, students submit documents, and the system checks submissions for plagiarism: against each other, against previously submitted work, and against the internet.
 
 Built with Python, Flask, SQLite and NLP.
