@@ -1,13 +1,3 @@
-"""
-internet_scan.py
-================
-Web plagiarism scanner. Searches the web with Tavily for passages from the
-submitted text, downloads the matching pages, and scores per-source similarity.
-
-Usage:
-    from app.services.internet_scan import check_internet_similarity
-"""
-
 from __future__ import annotations
 
 import os
@@ -17,6 +7,7 @@ from bs4 import BeautifulSoup
 from collections import Counter
 from difflib import SequenceMatcher
 from typing import Any, Dict, List
+from dotenv import load_dotenv
 
 
 # ─────────────────────────────────────────────
@@ -36,6 +27,9 @@ STOPWORDS: frozenset = frozenset({
 # ─────────────────────────────────────────────
 #  TAVILY API KEY (read from the environment at call time)
 # ─────────────────────────────────────────────
+from dotenv import load_dotenv
+load_dotenv()
+
 def _tavily_key() -> str:
     return os.getenv("TAVILY_API_KEY", "")
 
