@@ -65,6 +65,6 @@ def get_highlighted_texts(text1, text2):
     for s1 in sentences1:
         for s2 in sentences2:
             if difflib.SequenceMatcher(None, s1.lower(), s2.lower()).ratio() > 0.70:
-                h1 = h1.replace(s1, f'<mark class="bg-danger text-white rounded px-1">{s1}</mark>')
-                h2 = h2.replace(s2, f'<mark class="bg-danger text-white rounded px-1">{s2}</mark>')
+                h1 = h1.replace(s1, f'<mark class="match-highlight">{s1}</mark>')
+                h2 = h2.replace(s2, f'<mark class="match-highlight">{s2}</mark>')
     return h1, h2

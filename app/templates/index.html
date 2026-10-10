@@ -10,109 +10,73 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body>
+<body class="landing-page">
 
-    <!-- NAVBAR -->
-    <nav class="navbar-glass">
-        <div class="container d-flex justify-content-between align-items-center">
-            <a class="navbar-brand" href="/">
-                <i class="bi bi-shield-check"></i> PlagiarismGuard
-            </a>
-            <div class="dropdown">
-                <button class="auth-btn dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                    <i class="bi bi-person me-1"></i> System Login
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="/student-login">
-                            <i class="bi bi-mortarboard-fill me-2 text-success"></i> Student Portal
-                        </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="/teacher-login">
-                            <i class="bi bi-briefcase-fill me-2 text-danger"></i> Teacher Portal
-                        </a></li>
-                </ul>
-            </div>
+    <header class="site-header">
+        <a class="site-logo" href="/" aria-label="PlagiarismGuard home">
+            <span class="logo-mark"><i class="bi bi-shield-check"></i></span>
+            <span>PlagiarismGuard</span>
+        </a>
+        <nav class="main-nav" aria-label="Main navigation">
+            <a href="#home">Home</a>
+            <a href="#features">Features</a>
+            <a href="#faq">FAQ</a>
+        </nav>
+        <div class="header-actions">
+            <details class="login-menu">
+                <summary>Log in</summary>
+                <div class="login-options">
+                    <a href="/student-login">Student portal</a>
+                    <a href="/teacher-login">Teacher portal</a>
+                </div>
+            </details>
+            <a class="button button-dark header-cta" href="#quick-check">Get started <i class="bi bi-arrow-up-right"></i></a>
         </div>
-    </nav>
+    </header>
 
-    <!-- HERO -->
-    <div class="container hero-section">
-        <div class="row align-items-start g-5">
-
-            <!-- LEFT: Text + Upload -->
-            <div class="col-lg-6">
-                <span class="hero-tag">Academic Plagiarism Detection</span>
-
-                <h1 class="hero-title">
-                    Check documents for <span class="highlight">plagiarism</span> in seconds
-                </h1>
-
-                <p class="hero-sub">
-                    Upload a single file to scan against the internet, or multiple files to compare students against
-                    each other. Results in under a minute.
-                </p>
-
-                <div class="mb-3">
-                    <span class="stat-pill"><i class="bi bi-globe2"></i> <span>Web</span> Scan</span>
-                    <span class="stat-pill"><i class="bi bi-people"></i> <span>Peer-to-Peer</span></span>
-                    <span class="stat-pill"><i class="bi bi-robot"></i> <span>AI</span> Reports</span>
-                    <span class="stat-pill"><i class="bi bi-fingerprint"></i> <span>Winnowing</span></span>
+    <main>
+        <section class="hero-section" id="home">
+            <div class="hero-inner">
+                <div class="hero-copy">
+                    <span class="eyebrow"><span class="eyebrow-dot"></span> A clearer standard for original work</span>
+                    <h1>Integrity driven by AI, <span>not assumptions.</span></h1>
                 </div>
-
-                <!-- Upload Card -->
-                <div class="upload-card mt-4">
-                    <h3>Run a Plagiarism Scan</h3>
-                    <p>1 file = internet check &nbsp;|&nbsp; Multiple files = peer comparison</p>
-
-                    <form action="/compare" method="post" enctype="multipart/form-data">
-                        <div class="file-input-wrapper mb-3">
-                            <input type="file" name="files" multiple required>
-                        </div>
-                        <button type="submit" class="btn-gradient">
-                            <i class="bi bi-cpu me-2"></i> Run Deep Scan
-                        </button>
-                    </form>
+                <div class="hero-aside">
+                    <p>We deliver multi-document and web-based plagiarism detection that safeguards content originality with up to 99% accuracy.</p>
+                    <a class="button button-outline" href="#features">Explore the platform <i class="bi bi-arrow-down-right"></i></a>
+                </div>
+                <div class="hero-orbit" aria-hidden="true">
+                    <span class="orbit-line"></span><i class="bi bi-arrow-down-right"></i>
+                    <span class="orbit-caption">Clarity in every comparison</span>
                 </div>
             </div>
 
-            <!-- RIGHT: Feature list -->
-            <div class="col-lg-5 offset-lg-1">
-                <div class="feature-list">
-                    <div class="feature-item">
-                        <div class="feature-item-icon indigo"><i class="bi bi-globe2"></i></div>
-                        <div class="feature-item-text">
-                            <h6>Live Internet Scanning</h6>
-                            <p>Searches the web in real-time using Tavily API and scores each source using a 5-signal similarity engine.</p>
-                        </div>
+            <div class="upload-card" id="quick-check">
+                <div class="upload-heading">
+                    <div>
+                        <span class="upload-kicker">START A CHECK</span>
+                        <h2>Your next scan starts here.</h2>
                     </div>
-                    <div class="feature-item">
-                        <div class="feature-item-icon green"><i class="bi bi-people-fill"></i></div>
-                        <div class="feature-item-text">
-                            <h6>Peer-to-Peer Comparison</h6>
-                            <p>Upload a whole class batch. Gestalt pattern matching compares every file against each other with sentence-level highlighting.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-item-icon orange"><i class="bi bi-robot"></i></div>
-                        <div class="feature-item-text">
-                            <h6>AI Investigator Reports</h6>
-                            <p>Google Gemini 1.5 Flash generates a plain-English summary of detected plagiarism for teachers.</p>
-                        </div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-item-icon blue"><i class="bi bi-fingerprint"></i></div>
-                        <div class="feature-item-text">
-                            <h6>Winnowing Engine</h6>
-                            <p>Cryptographic k-gram fingerprinting scans your entire submission database for cross-course structural matches.</p>
-                        </div>
-                    </div>
+                    <span class="upload-icon"><i class="bi bi-file-earmark-arrow-up"></i></span>
                 </div>
+                <p class="upload-description">One document checks the web. Add multiple documents to compare them side by side.</p>
+                <form action="/compare" method="post" enctype="multipart/form-data">
+                    <label class="file-drop" for="scan-files">
+                        <span class="file-drop-icon"><i class="bi bi-cloud-arrow-up"></i></span>
+                        <span class="file-drop-copy"><strong id="file-prompt">Choose documents to scan</strong><small id="file-hint">PDF, DOCX or TXT · select multiple for comparison</small></span>
+                        <span class="file-browse">Browse files</span>
+                        <input id="scan-files" type="file" name="files" accept=".pdf,.docx,.txt" multiple required>
+                    </label>
+                    <button type="submit" class="button button-dark submit-button">Submit check <i class="bi bi-arrow-right"></i></button>
+                </form>
+                <div class="upload-footnote"><i class="bi bi-lock"></i> Your documents are handled securely</div>
             </div>
+            <a class="hero-scroll" href="#features"><span></span> SCROLL TO EXPLORE</a>
+        </section>
 
-        </div>
-
+        <div class="container report-wrap">
         <!-- RESULTS -->
-        <div class="row justify-content-center mt-4" id="report-content">
+        <div class="row justify-content-center mt-4">
             <div class="col-lg-10">
 
                 {% if error %}
@@ -124,73 +88,60 @@
                 {% if results or internet_results or ai_report %}
 
                 {% if internet_results %}
-                <div class="dashboard-card mb-3" style="border-left: 3px solid #ef4444;">
-                    <h6 class="fw-bold text-danger mb-3">
-                        <i class="bi bi-globe-americas me-2"></i> Internet Plagiarism Report
-                    </h6>
+                <section class="report-shell mb-3">
+                    <header class="report-heading">
+                        <h2><i class="bi bi-globe-americas"></i> Internet Plagiarism Report</h2>
+                    </header>
 
                     {% for filename, scan in internet_results.items() %}
-                    <div class="mb-4">
-                        <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-                            <span class="fw-semibold"><i class="bi bi-file-earmark-text text-danger me-1"></i>{{ filename }}</span>
-                            <span class="badge px-3 py-2 {% if scan.level == 'danger' %}bg-danger{% elif scan.level == 'warning' %}bg-warning text-dark{% elif scan.level == 'caution' %}bg-secondary{% else %}bg-success{% endif %}">
-                                {{ scan.icon }} {{ scan.overall_pct }}% — {{ scan.verdict }}
-                            </span>
+                    <article class="report-document">
+                        <div class="report-summary">
+                            <div class="report-fileline">
+                                <i class="bi bi-file-earmark-text"></i>
+                                <span>{{ filename }}</span>
+                            </div>
+                            <span class="report-status"><i class="bi bi-check-circle-fill"></i>{{ scan.overall_pct }}% — {{ scan.verdict }}</span>
                         </div>
 
-                        <div class="progress mb-3" style="height:18px;border-radius:6px;">
-                            {% set bar_color = 'bg-danger' if scan.overall_pct >= 60 else ('bg-warning text-dark' if scan.overall_pct >= 35 else ('bg-secondary' if scan.overall_pct >= 15 else 'bg-success')) %}
-                            <div class="progress-bar fw-semibold {{ bar_color }}" style="width:{{ scan.overall_pct }}%;">
-                                {{ scan.overall_pct }}%
+                        <div class="report-score">
+                            <div class="report-score-label"><span>Overall similarity</span><strong>{{ scan.overall_pct }}%</strong></div>
+                            <div class="report-progress" role="progressbar" aria-label="Overall similarity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ scan.overall_pct }}">
+                                <span data-score="{{ scan.overall_pct }}"></span>
                             </div>
                         </div>
 
                         {% if scan.matches %}
-                        <p class="fw-semibold text-secondary small mb-2"><i class="bi bi-link-45deg"></i> Matched Sources</p>
-                        <div class="table-responsive mb-3" style="border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
-                            <table class="table table-hover align-middle mb-0 bg-white">
-                                <thead style="background:#334155;">
-                                    <tr>
-                                        <th style="width:45%;color:#f8fafc;padding:0.8rem;border-bottom:none;font-size:0.85rem;">Website</th>
-                                        <th style="width:35%;color:#f8fafc;padding:0.8rem;border-bottom:none;font-size:0.85rem;">Snippet</th>
-                                        <th style="width:20%;color:#f8fafc;padding:0.8rem;border-bottom:none;font-size:0.85rem;text-align:center;">Match %</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for match in scan.matches %}
-                                    <tr>
-                                        <td style="padding:0.8rem;">
-                                            <a href="{{ match.url }}" target="_blank" class="text-danger fw-medium text-decoration-none d-block text-truncate" style="max-width:260px;font-size:0.88rem;" title="{{ match.url }}">
-                                                <i class="bi bi-globe me-1"></i>{{ match.title if match.title else match.url }}
-                                            </a>
-                                            <small class="text-muted d-block text-truncate" style="max-width:260px;font-size:0.75rem;">{{ match.url }}</small>
-                                        </td>
-                                        <td style="padding:0.8rem;">
-                                            <small class="text-muted fst-italic" style="font-size:0.82rem;">{{ match.snippet[:100] if match.snippet else '—' }}…</small>
-                                        </td>
-                                        <td style="padding:0.8rem;text-align:center;">
-                                            <span class="badge px-3 py-2 {% if match.pct >= 60 %}bg-danger{% elif match.pct >= 35 %}bg-warning text-dark{% elif match.pct >= 15 %}bg-secondary{% else %}bg-success{% endif %}">
-                                                {{ match.pct }}%
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                        <div class="matched-sources-heading"><h3><i class="bi bi-link-45deg"></i> Matched Sources</h3><span>{{ scan.matches|length }} source{{ 's' if scan.matches|length != 1 else '' }}</span></div>
+                        <div class="source-grid">
+                            {% for match in scan.matches %}
+                            <article class="source-card">
+                                <div class="source-card-top">
+                                    <div class="source-identity">
+                                        <span class="source-icon"><i class="bi bi-globe2"></i></span>
+                                        <div class="source-address">
+                                            <a href="{{ match.url }}" target="_blank" rel="noopener noreferrer" class="source-title" title="{{ match.title if match.title else match.url }}">{{ match.title if match.title else match.url }}</a>
+                                            <a href="{{ match.url }}" target="_blank" rel="noopener noreferrer" class="source-url">{{ match.url }}</a>
+                                        </div>
+                                    </div>
+                                    <span class="source-match">{{ match.pct }}%</span>
+                                </div>
+                                <p class="source-snippet">{{ match.snippet[:180] if match.snippet else 'No preview available for this source.' }}{% if match.snippet and match.snippet|length > 180 %}…{% endif %}</p>
+                            </article>
+                            {% endfor %}
                         </div>
                         {% else %}
-                        <p class="text-success small fw-medium"><i class="bi bi-check-circle me-1"></i> No matching sources found.</p>
+                        <div class="no-sources"><i class="bi bi-check-circle-fill"></i><span>No matching sources found.</span></div>
                         {% endif %}
 
                         {% if scan.sentence_matches %}
-                        <p class="fw-semibold text-secondary small mb-2 mt-3"><i class="bi bi-paragraph me-1"></i> Suspicious Sentences</p>
+                        <h3 class="sentence-heading"><i class="bi bi-paragraph"></i> Suspicious Sentences</h3>
                         <div class="accordion" id="sentAccordion_{{ loop.index }}">
                             {% for sm in scan.sentence_matches %}
-                            <div class="accordion-item" style="border:1px solid #fee2e2;margin-bottom:4px;border-radius:6px;overflow:hidden;">
+                            <div class="accordion-item sentence-item">
                                 <h2 class="accordion-header">
-                                    <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#sent_{{ loop.index }}_{{ loop.index0 }}" style="font-size:0.88rem;">
-                                        <span class="badge me-2 {% if sm.score >= 60 %}bg-danger{% elif sm.score >= 35 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ sm.score }}%</span>
-                                        <span class="text-truncate" style="max-width:460px;">{{ sm.source[:110] }}</span>
+                                    <button class="accordion-button collapsed sentence-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sent_{{ loop.index }}_{{ loop.index0 }}">
+                                        <span class="source-match sentence-match">{{ sm.score }}%</span>
+                                        <span class="text-truncate">{{ sm.source[:110] }}</span>
                                     </button>
                                 </h2>
                                 <div id="sent_{{ loop.index }}_{{ loop.index0 }}" class="accordion-collapse collapse">
@@ -201,7 +152,7 @@
                                                 <p class="text-dark">{{ sm.source }}</p>
                                             </div>
                                             <div class="col-md-6">
-                                                <p class="text-muted small fw-bold mb-1">Matched from <a href="{{ sm.source_url }}" target="_blank" class="text-danger">source</a>:</p>
+                                                <p class="text-muted small fw-bold mb-1">Matched from <a href="{{ sm.source_url }}" target="_blank" rel="noopener noreferrer" class="sentence-source-link">source</a>:</p>
                                                 <p class="text-dark fst-italic">{{ sm.matched }}</p>
                                             </div>
                                         </div>
@@ -212,15 +163,15 @@
                         </div>
                         {% endif %}
 
-                    </div>
+                    </article>
                     {% if not loop.last %}<hr class="my-4">{% endif %}
                     {% endfor %}
-                </div>
+                </section>
                 {% endif %}
 
                 {% if ai_report %}
-                <div class="dashboard-card mb-3" style="border-left:3px solid #3b82f6;background:#f0f7ff;">
-                    <h6 class="fw-bold mb-2" style="color:#1d4ed8;">
+                <div class="dashboard-card ai-summary-card mb-3 {% if ai_report_unavailable %}ai-summary-unavailable{% endif %}" {% if ai_report_unavailable %}role="status" aria-live="polite"{% endif %}>
+                    <h6 class="fw-bold mb-2">
                         <i class="bi bi-robot me-2"></i> AI Investigator's Summary
                     </h6>
                     <p class="mb-0 text-dark" style="font-size:0.9rem;line-height:1.7;">{{ ai_report }}</p>
@@ -228,41 +179,45 @@
                 {% endif %}
 
                 {% if results %}
-                <div class="dashboard-card">
+                <div class="dashboard-card analysis-report-card" id="analysis-container">
+                    <div class="pdf-download-section" id="pdf-download-section">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h5 class="fw-bold mb-0">Analysis Results</h5>
-                        <button onclick="downloadPDF()" class="btn btn-sm btn-outline-danger fw-semibold">
+                        <button type="button" onclick="downloadPDF()" class="report-download pdf-exclude" data-html2canvas-ignore="true">
                             <i class="bi bi-filetype-pdf me-1"></i> Download PDF
                         </button>
                     </div>
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="similarity-list" aria-label="Document similarity scores">
                             {% for file1, file2, score in results %}
-                            <div class="mb-3 p-3 border rounded-3 bg-light">
-                                <p class="mb-2 small fw-semibold text-dark"><i class="bi bi-file-text me-1 text-primary"></i>{{ file1 }} <span class="text-muted">vs</span> {{ file2 }}</p>
-                                <div class="progress" style="height:20px;border-radius:6px;">
-                                    <div class="progress-bar progress-dynamic fw-semibold" data-score="{{ score }}"></div>
+                            <article class="similarity-row">
+                                <div class="similarity-label">
+                                    <span><i class="bi bi-file-earmark-text"></i> {{ file1 }} <span class="similarity-vs">vs</span> {{ file2 }}</span>
+                                    <strong>{{ score }}%</strong>
                                 </div>
-                            </div>
+                                <div class="similarity-track" role="progressbar" aria-label="Similarity between {{ file1 }} and {{ file2 }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ score }}">
+                                    <span data-score="{{ score }}"></span>
+                                </div>
+                            </article>
                             {% endfor %}
                         </div>
-                        <div class="col-md-6"><canvas id="chart"></canvas></div>
+                    </div>
                     </div>
 
                     {% if detailed_comparisons %}
-                    <div class="mt-4" id="side-by-side-section">
-                        <h5 class="fw-bold mb-3"><i class="bi bi-layout-split text-primary me-2"></i> Side-by-Side Comparison</h5>
+                    <div class="side-by-side-section mt-4" id="side-by-side-section">
+                        <h5 class="fw-bold mb-3"><i class="bi bi-layout-split text-teal me-2"></i> Side-by-Side Comparison</h5>
                         {% for comp in detailed_comparisons %}
-                        <div class="card mb-3 border rounded-3 overflow-hidden shadow-sm">
+                        <div class="card comparison-card mb-3 border rounded-3 shadow-sm">
                             <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2">
                                 <span class="small fw-semibold">{{ comp.file1 }} <span class="text-muted mx-1">vs</span> {{ comp.file2 }}</span>
-                                <span class="badge bg-danger">{{ comp.score }}% Match</span>
+                                <span class="badge match-pill">{{ comp.score }}% Match</span>
                             </div>
                             <div class="card-body row g-0 p-0">
-                                <div class="col-md-6 p-3 border-end bg-light" style="max-height:400px;overflow-y:auto;">
+                                <div class="col-md-6 comparison-pane p-3 border-end bg-light">
                                     <p style="white-space:pre-wrap;font-size:0.88rem;line-height:1.8;color:#333;">{{ comp.text1 | safe }}</p>
                                 </div>
-                                <div class="col-md-6 p-3" style="max-height:400px;overflow-y:auto;">
+                                <div class="col-md-6 comparison-pane p-3">
                                     <p style="white-space:pre-wrap;font-size:0.88rem;line-height:1.8;color:#333;">{{ comp.text2 | safe }}</p>
                                 </div>
                             </div>
@@ -278,71 +233,110 @@
         </div>
     </div>
 
-    <!-- FOOTER -->
-    <div class="footer-bar">
-        <p class="mb-0">PlagiarismGuard &copy; 2025 &nbsp;·&nbsp; Built for Academic Integrity &nbsp;·&nbsp; GBPIET, Pauri</p>
-    </div>
+        <section class="features-section" id="features">
+            <div class="features-inner">
+                <div class="section-heading">
+                    <span class="eyebrow"><span class="eyebrow-dot"></span> Thoughtful tools, better decisions</span>
+                    <h2>Plagiarism intelligence<br>at work.</h2>
+                    <p>Empower your research and content creation with PlagiarismGuard's AI-driven detection engines.</p>
+                </div>
+                <div class="feature-grid">
+                    <article class="feature-card feature-web">
+                        <div class="feature-topline"><span>01 / WEB SEARCH</span><i class="bi bi-arrow-up-right"></i></div>
+                        <div class="visual visual-web" aria-hidden="true"><div class="web-globe"><span></span><span></span><span></span></div><div class="web-scan scan-one"></div><div class="web-scan scan-two"></div><div class="web-scan scan-three"></div><span class="visual-caption">LIVE INDEX <b>●</b></span></div>
+                        <div class="feature-copy"><h3>Real-time web indexing</h3><p>Scans billions of live web pages and articles using Tavily Search API for exact matching.</p></div>
+                    </article>
+                    <article class="feature-card feature-ai">
+                        <div class="feature-topline"><span>02 / AI DETECTION</span><i class="bi bi-arrow-up-right"></i></div>
+                        <div class="visual visual-ai" aria-hidden="true"><div class="ai-core"><i class="bi bi-stars"></i></div><span class="ai-orbit orbit-a"></span><span class="ai-orbit orbit-b"></span><span class="ai-node node-a"></span><span class="ai-node node-b"></span><span class="ai-node node-c"></span><span class="visual-caption">PATTERN ANALYSIS</span></div>
+                        <div class="feature-copy"><h3>Generative AI detection</h3><p>Detects machine-generated patterns and AI paraphrasing powered by Gemini API.</p></div>
+                    </article>
+                    <article class="feature-card feature-docs">
+                        <div class="feature-topline"><span>03 / MULTI-DOCUMENT</span><i class="bi bi-arrow-up-right"></i></div>
+                        <div class="visual visual-docs" aria-hidden="true"><div class="doc-sheet sheet-back"><span></span><span></span><span></span></div><div class="doc-sheet sheet-front"><span></span><span></span><span></span><b>98%</b></div><div class="doc-link"><i class="bi bi-arrow-left-right"></i></div><span class="visual-caption">CROSS-CHECK COMPLETE</span></div>
+                        <div class="feature-copy"><h3>Cross-document comparison</h3><p>Upload multiple local files simultaneously to uncover internal overlaps and similarity index.</p></div>
+                    </article>
+                    <article class="feature-card feature-reports">
+                        <div class="feature-topline"><span>04 / REPORTS</span><i class="bi bi-arrow-up-right"></i></div>
+                        <div class="visual visual-reports" aria-hidden="true"><div class="report-window"><div class="report-window-head"><i></i><i></i><i></i><span>INTEGRITY REPORT</span></div><div class="report-window-body"><div class="report-chart"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="report-lines"><i></i><i></i><i></i></div></div></div><span class="report-badge"><i class="bi bi-check2"></i> READY</span></div>
+                        <div class="feature-copy"><h3>Instant similarity analytics</h3><p>Generate actionable visual heatmaps and downloadable PDF integrity reports.</p></div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="faq-section" id="faq">
+            <div class="faq-inner">
+                <div class="faq-heading"><span class="eyebrow"><span class="eyebrow-dot"></span> Good to know</span><h2>Questions, answered.</h2></div>
+                <div class="faq-list">
+                    <details><summary>What files can I check?<i class="bi bi-plus"></i></summary><p>Upload PDF, DOCX, or TXT documents. You can select several files to compare them together.</p></details>
+                    <details><summary>How does a document check work?<i class="bi bi-plus"></i></summary><p>A single document is scanned against web sources. Multiple documents are compared with one another for overlapping content.</p></details>
+                    <details><summary>Do I need an account to start?<i class="bi bi-plus"></i></summary><p>You can run a quick scan from this page. Sign in to the student or teacher portal to access coursework features.</p></details>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <a class="site-logo" href="/"><span class="logo-mark"><i class="bi bi-shield-check"></i></span><span>PlagiarismGuard</span></a>
+        <p>Original work deserves a closer look.</p>
+        <span>© 2025 PlagiarismGuard · Built for academic integrity</span>
+    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <script>
+        const scanFiles = document.getElementById('scan-files');
+        scanFiles.addEventListener('change', () => {
+            const count = scanFiles.files.length;
+            document.getElementById('file-prompt').textContent = count ? `${count} document${count === 1 ? '' : 's'} selected` : 'Choose documents to scan';
+            document.getElementById('file-hint').textContent = count ? Array.from(scanFiles.files, file => file.name).join(', ') : 'PDF, DOCX or TXT · select multiple for comparison';
+        });
+        document.querySelectorAll('.report-progress span').forEach(bar => {
+            const score = Number(bar.dataset.score);
+            if (Number.isFinite(score)) bar.style.width = `${Math.max(0, Math.min(100, score))}%`;
+        });
+        document.querySelectorAll('.similarity-track span').forEach(bar => {
+            const score = Number(bar.dataset.score);
+            if (Number.isFinite(score)) bar.style.width = `${Math.max(0, Math.min(100, score))}%`;
+        });
+    </script>
 
     {% if results %}
     <script>
-        document.querySelectorAll('.progress-dynamic').forEach(bar => {
-            let val = parseFloat(bar.getAttribute('data-score'));
-            if (!isNaN(val)) {
-                bar.style.width = val + "%";
-                if (val <= 15) { bar.classList.add('bg-success'); bar.innerText = val + "% (Safe)"; }
-                else if (val <= 30) { bar.classList.add('bg-warning', 'text-dark'); bar.innerText = val + "% (Review)"; }
-                else { bar.classList.add('bg-danger'); bar.innerText = val + "% (Flagged)"; }
-            }
-        });
-
-        const rawDataStr = '{{ results | tojson | safe }}';
-        if (rawDataStr && rawDataStr !== '""' && rawDataStr !== 'null') {
-            const rawData = JSON.parse(rawDataStr);
-            if (rawData && rawData.length > 0) {
-                const labels = rawData.map(r => r[0] + " vs " + r[1]);
-                const scores = rawData.map(r => r[2]);
-                const colors = scores.map(s => s <= 15 ? 'rgba(16,185,129,0.75)' : (s <= 30 ? 'rgba(245,158,11,0.75)' : 'rgba(239,68,68,0.75)'));
-                new Chart(document.getElementById('chart').getContext('2d'), {
-                    type: 'bar',
-                    data: { labels, datasets: [{ label: 'Similarity %', data: scores, backgroundColor: colors, borderRadius: 6 }] },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            y: { beginAtZero: true, max: 100 },
-                            x: {
-                                ticks: {
-                                    callback: function(val) {
-                                        const label = this.getLabelForValue(val);
-                                        return label.length > 18 ? label.substring(0, 18) + '...' : label;
-                                    },
-                                    maxRotation: 0,
-                                    minRotation: 0,
-                                    font: { size: 10 }
-                                }
-                            }
-                        },
-                        plugins: { legend: { display: false } }
-                    }
-                });
-            }
-        }
-
-        function downloadPDF() {
-            const element = document.getElementById('report-content');
+        async function downloadPDF() {
+            const element = document.getElementById('pdf-download-section');
             if (!element) return;
-            const btn = element.querySelector('button');
-            if (btn) btn.style.display = 'none';
-            const ss = document.getElementById('side-by-side-section');
-            if (ss) ss.style.display = 'none';
-            html2pdf().set({ margin: 0.4, filename: 'Plagiarism_Report.pdf', jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' } })
-                .from(element).save().then(() => {
-                    if (btn) btn.style.display = 'block';
-                    if (ss) ss.style.display = 'block';
-                });
+            if (typeof window.html2pdf !== 'function') {
+                window.print();
+                return;
+            }
+
+            try {
+                await window.html2pdf().set({
+                    margin: 0.35,
+                    filename: 'Plagiarism_Report.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: '#fffefa',
+                        scrollY: 0,
+                        onclone: clonedDocument => {
+                            const report = clonedDocument.getElementById('pdf-download-section');
+                            if (!report) return;
+                            report.style.overflow = 'visible';
+                            report.querySelectorAll('.pdf-exclude').forEach(node => node.remove());
+                        }
+                    },
+                    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                }).from(element).save();
+            } catch (error) {
+                console.error('PDF export failed; opening the print dialog.', error);
+                window.print();
+            }
         }
     </script>
     {% endif %}

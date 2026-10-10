@@ -10,8 +10,9 @@ INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
 class Config:
     # Secrets come from the environment (.env locally). Never hardcode them.
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-me")
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    GEMINI_TIMEOUT_MS = os.getenv("GEMINI_TIMEOUT_MS", "30000")
     TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
 
     # Runtime data lives in instance/ (git-ignored): database + student uploads

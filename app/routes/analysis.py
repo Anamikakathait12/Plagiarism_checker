@@ -67,11 +67,13 @@ def compare():
                                assignments=assignments, courses=courses, tasks=tasks,
                                enrolled_courses=enrolled_courses,
                                results=[], internet_results={}, ai_report=None,
+                               ai_report_unavailable=False,
                                detailed_comparisons=[],
                                selected_course_id=None, selected_course_name=None)
 
     internet_results     = {}
     ai_report            = None
+    ai_report_unavailable = False
     results              = []
     detailed_comparisons = []
 
@@ -83,9 +85,12 @@ def compare():
         if len(doc_text.split()) > 10:
             scan = check_internet_similarity(doc_text)
             internet_results[filename] = scan
-            ai_report = generate_ai_report(doc_text, [m['url'] for m in scan.get('matches', [])])
+            ai_report, ai_report_unavailable = generate_ai_report(
+                doc_text, [m['url'] for m in scan.get('matches', [])]
+            )
             if not scan['matches']:
                 ai_report = f"✅ No internet matches found for '{filename}'."
+                ai_report_unavailable = False
         else:
             ai_report = f"⚠️ '{filename}' has fewer than 10 words."
 
@@ -111,6 +116,7 @@ def compare():
         enrolled_courses=enrolled_courses,
         detailed_comparisons=detailed_comparisons,
         internet_results=internet_results, ai_report=ai_report,
+        ai_report_unavailable=ai_report_unavailable,
         selected_course_id=None, selected_course_name=None
     )
 

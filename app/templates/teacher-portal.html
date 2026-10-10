@@ -7,7 +7,6 @@
     <title>Teacher Portal Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
@@ -86,10 +85,72 @@
             width: 100%;
             overflow-x: auto;
         }
+
+        .ai-summary-card {
+            border-left: 4px solid #006d77 !important;
+            border-radius: 12px;
+            background: #eef7f6 !important;
+            box-shadow: 0 8px 24px rgba(0, 65, 70, 0.1);
+            color: #263b3b;
+        }
+
+        .ai-summary-card h5 {
+            color: #006d77 !important;
+        }
+
+        .ai-summary-unavailable {
+            background: #f0f6f6 !important;
+        }
+
+        .analysis-report-card {
+            border: 1px solid #e7e4d8;
+            border-radius: 14px;
+            background: #fffefa;
+            color: #202724;
+        }
+
+        .report-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 0;
+            border-radius: 999px;
+            padding: 10px 17px;
+            background: #006d77;
+            color: #fff;
+            font-size: .85rem;
+            font-weight: 700;
+        }
+
+        .report-download:hover { background: #00565e; color: #fff; }
+        .bg-teal { background-color: #006d77 !important; color: #fff !important; }
+        .text-teal { color: #006d77 !important; }
+        .match-pill { border-radius: 999px; background: #1e293b; color: #fff; }
+        .similarity-list { display: grid; gap: 12px; }
+        .similarity-row { padding: 15px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fffefa; }
+        .similarity-label { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 10px; color: #263238; font-size: .84rem; font-weight: 600; overflow-wrap: anywhere; }
+        .similarity-label > span { min-width: 0; line-height: 1.55; }
+        .similarity-label i, .similarity-label strong { color: #006d77; }
+        .similarity-label strong { flex: 0 0 auto; white-space: nowrap; }
+        .similarity-vs { padding: 0 4px; color: #77818a; font-size: .72rem; font-weight: 500; }
+        .similarity-track { height: 10px; overflow: hidden; border-radius: 999px; background: #e8edef; }
+        .similarity-track span { width: 0; height: 100%; display: block; border-radius: inherit; background: #006d77; transition: width 450ms ease; }
+        .comparison-pane { max-height: 500px; overflow-y: auto; }
+        .comparison-card { border-radius: 10px; }
+        mark.match-highlight { padding: 0 .25rem; border-radius: 4px; background: #006d77; color: #fff; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+
+        @media print {
+            @page { size: A4 landscape; margin: 10mm; }
+            body * { visibility: hidden !important; }
+            #pdf-download-section, #pdf-download-section * { visibility: visible !important; }
+            #pdf-download-section { position: absolute !important; top: 0; left: 0; width: 100% !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; background: #fffefa !important; box-shadow: none !important; }
+            .pdf-exclude { display: none !important; }
+        }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='portal-theme.css') }}">
 </head>
 
-<body>
+<body class="portal-page dashboard-page teacher-dashboard">
 
     <nav class="navbar navbar-expand-lg py-3 mb-5 navbar-glass">
         <div class="container d-flex justify-content-between align-items-center">
@@ -502,57 +563,59 @@
         {% endif %}
 
         {% if ai_report %}
-        <div class="dashboard-card bg-info bg-opacity-10 border-info mb-4" style="padding: 1.5rem;">
-            <h5 class="fw-bold text-info mb-3"><i class="bi bi-robot me-2"></i> AI Investigator's Executive Summary</h5>
+        <div class="dashboard-card ai-summary-card {% if ai_report_unavailable %}ai-summary-unavailable{% endif %} mb-4" style="padding: 1.5rem;" {% if ai_report_unavailable %}role="status" aria-live="polite"{% endif %}>
+            <h5 class="fw-bold mb-3"><i class="bi bi-robot me-2"></i> AI Investigator's Executive Summary</h5>
             <p class="mb-0 text-dark fw-medium" style="line-height: 1.6;">{{ ai_report }}</p>
         </div>
         {% endif %}
 
         {% if results %}
-        <div class="dashboard-card mt-4" id="report-content">
+        <div class="dashboard-card analysis-report-card mt-4" id="analysis-container">
+            <div class="pdf-download-section" id="pdf-download-section">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div class="d-flex align-items-center">
                     <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3"><i
                             class="bi bi-bar-chart-fill text-success fs-4"></i></div>
                     <h4 class="mb-0 fw-bold">Analysis Results</h4>
                 </div>
-                <button onclick="downloadPDF()" class="btn btn-danger fw-bold shadow-sm"><i
-                        class="bi bi-filetype-pdf me-2"></i> Download PDF Report</button>
+                <button type="button" onclick="downloadPDF()" class="report-download pdf-exclude" data-html2canvas-ignore="true">
+                    <i class="bi bi-filetype-pdf"></i> Download PDF Report
+                </button>
             </div>
-            <div class="row">
-                <div class="col-md-6">
-                    {% for file1, file2, score in results %}
-                    <div class="mb-4 p-3 border rounded bg-light">
-                        <p class="mb-2 fw-medium"><i class="bi bi-file-text me-2"></i><strong>{{ file1 }}</strong> <span
-                                class="text-muted mx-2">vs</span> <strong>{{ file2 }}</strong></p>
-                        <div class="progress" style="height: 25px; border-radius: 8px;">
-                            <div class="progress-bar progress-dynamic fw-bold" data-score="{{ score }}"></div>
-                        </div>
+            <div class="similarity-list" aria-label="Document similarity scores">
+                {% for file1, file2, score in results %}
+                <article class="similarity-row">
+                    <div class="similarity-label">
+                        <span><i class="bi bi-file-earmark-text"></i> {{ file1 }} <span class="similarity-vs">vs</span> {{ file2 }}</span>
+                        <strong>{{ score }}%</strong>
                     </div>
-                    {% endfor %}
-                </div>
-                <div class="col-md-6"><canvas id="chart"></canvas></div>
+                    <div class="similarity-track" role="progressbar" aria-label="Similarity between {{ file1 }} and {{ file2 }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ score }}">
+                        <span data-score="{{ score }}"></span>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
             </div>
 
             {% if detailed_comparisons %}
-            <div class="mt-5" id="side-by-side-section">
-                <h4 class="mb-4 fw-bold text-dark"><i class="bi bi-layout-split text-primary me-2"></i> Side-by-Side
+            <div class="side-by-side-section mt-5" id="side-by-side-section">
+                <h4 class="mb-4 fw-bold text-dark"><i class="bi bi-layout-split text-teal me-2"></i> Side-by-Side
                     Comparison</h4>
                 {% for comp in detailed_comparisons %}
-                <div class="card mb-4 border-0 shadow-sm overflow-hidden">
+                <div class="card comparison-card mb-4 border-0 shadow-sm">
                     <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
                         <span class="fs-5"><strong>{{ comp.file1 }}</strong> <span class="text-muted mx-2">vs</span>
                             <strong>{{ comp.file2 }}</strong></span>
-                        <span class="badge bg-danger fs-6">{{ comp.score }}% Match</span>
+                        <span class="badge match-pill fs-6">{{ comp.score }}% Match</span>
                     </div>
                     <div class="card-body row g-0 p-0">
-                        <div class="col-md-6 p-4 border-end bg-light" style="max-height: 500px; overflow-y: auto;">
+                        <div class="col-md-6 comparison-pane p-4 border-end bg-light">
                             <h6 class="text-secondary border-bottom border-secondary border-opacity-25 pb-2 mb-3"><i
                                     class="bi bi-file-text me-2"></i>{{ comp.file1 }}</h6>
                             <p style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.8; color: #333;">{{
                                 comp.text1 | safe }}</p>
                         </div>
-                        <div class="col-md-6 p-4 bg-white" style="max-height: 500px; overflow-y: auto;">
+                        <div class="col-md-6 comparison-pane p-4 bg-white">
                             <h6 class="text-secondary border-bottom border-secondary border-opacity-25 pb-2 mb-3"><i
                                     class="bi bi-file-text me-2"></i>{{ comp.file2 }}</h6>
                             <p style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.8; color: #333;">{{
@@ -570,63 +633,43 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script>
-        // 1. SMART PROGRESS BARS
-        document.querySelectorAll('.progress-dynamic').forEach(bar => {
-            let val = parseFloat(bar.getAttribute('data-score'));
-            if (!isNaN(val)) {
-                bar.style.width = val + "%";
-                if (val <= 15.0) { bar.classList.add('bg-success'); bar.innerText = val + "% (Safe)"; }
-                else if (val <= 30.0) { bar.classList.add('bg-warning', 'text-dark'); bar.innerText = val + "% (Review)"; }
-                else { bar.classList.add('bg-danger'); bar.innerText = val + "% (Flagged)"; }
-            }
+        document.querySelectorAll('.similarity-track span').forEach(bar => {
+            const score = Number(bar.dataset.score);
+            if (Number.isFinite(score)) bar.style.width = Math.max(0, Math.min(100, score)) + "%";
         });
 
-        // 2. DYNAMIC CHART RENDERER (Safely parsed using a template fallback check to prevent runtime script failure)
-        const rawData = JSON.parse('{{ results | tojson | safe }}' || '[]');
-        if (rawData.length > 0) {
-            const chartLabels = rawData.map(row => row[0] + " vs " + row[1]);
-            const chartScores = rawData.map(row => row[2]);
-            const chartColors = chartScores.map(score => {
-                if (score <= 15.0) return 'rgba(25, 135, 84, 0.8)';
-                if (score <= 30.0) return 'rgba(255, 193, 7, 0.8)';
-                return 'rgba(220, 53, 69, 0.8)';
-            });
-            new Chart(document.getElementById('chart').getContext('2d'), {
-                type: 'bar',
-                data: { labels: chartLabels, datasets: [{ label: 'Plagiarism Score (%)', data: chartScores, backgroundColor: chartColors, borderRadius: 6 }] },
-                options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
-            });
-        }
-
-        // 3. ENTERPRISE PDF GENERATOR
-        function downloadPDF() {
-            const element = document.getElementById('report-content');
+        async function downloadPDF() {
+            const element = document.getElementById('pdf-download-section');
             if (!element) return;
-            const overlay = document.createElement('div');
-            overlay.style.position = 'fixed'; overlay.style.top = '0'; overlay.style.left = '0'; overlay.style.width = '100vw'; overlay.style.height = '100vh';
-            overlay.style.backgroundColor = 'rgba(15, 23, 42, 0.95)'; overlay.style.zIndex = '9999'; overlay.style.display = 'flex';
-            overlay.style.flexDirection = 'column'; overlay.style.alignItems = 'center'; overlay.style.justifyContent = 'center'; overlay.style.color = 'white';
-            overlay.innerHTML = `<div class="spinner-border text-info mb-4" style="width: 4rem; height: 4rem; border-width: 0.4rem;"></div><h2 class="fw-bold">Generating PDF...</h2>`;
-            document.body.appendChild(overlay);
-            window.scrollTo(0, 0);
-            const btn = element.querySelector('button');
-            if (btn) btn.style.display = 'none';
+            if (typeof window.html2pdf !== 'function') {
+                window.print();
+                return;
+            }
 
-            const opt = {
-                margin: [0.5, 0.5],
-                filename: 'Plagiarism_Report.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-
-            html2pdf().set(opt).from(element).save().then(() => {
-                if (btn) btn.style.display = 'block';
-                document.body.removeChild(overlay);
-            }).catch(err => {
-                console.error(err);
-                document.body.removeChild(overlay);
-            });
+            try {
+                await window.html2pdf().set({
+                    margin: 0.35,
+                    filename: 'Plagiarism_Report.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: '#fffefa',
+                        scrollY: 0,
+                        onclone: clonedDocument => {
+                            const report = clonedDocument.getElementById('pdf-download-section');
+                            if (!report) return;
+                            report.style.overflow = 'visible';
+                            report.querySelectorAll('.pdf-exclude').forEach(node => node.remove());
+                        }
+                    },
+                    jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                }).from(element).save();
+            } catch (error) {
+                console.error('PDF export failed; opening the print dialog.', error);
+                window.print();
+            }
         }
     </script>
 </body>
