@@ -31,13 +31,13 @@ Built with Python, Flask, SQLite and NLP.
 
 ## Screenshots
 
-| Home | Teacher dashboard | Student dashboard |
+| Landing page | Internet plagiarism report | Multi-document comparison |
 |---|---|---|
-| ![Home](docs/screenshots/homepage.png) | ![Teacher](docs/screenshots/teacher-dashboard.png) | ![Student](docs/screenshots/student-dashboard.png) |
+| ![PlagiarismGuard landing page](docs/screenshots/Home%20page.png) | ![Internet plagiarism report](docs/screenshots/internet.png) | ![Multi-document analysis and side-by-side comparison](docs/screenshots/multiple%20documents.png) |
 
-| Side-by-side comparison | Global scan | Internet scan |
-|---|---|---|
-| ![Side by side](docs/screenshots/side-by-side.png) | ![Global scan](docs/screenshots/global_scan.png) | ![Internet](docs/screenshots/internet.png) |
+| Student dashboard | Teacher dashboard |
+|---|---|
+| ![Student dashboard](docs/screenshots/student-dashboard.png) | ![Teacher dashboard](docs/screenshots/teacher-dashboard.png) |
 
 Algorithm benchmarks are in [`docs/benchmarks/`](docs/benchmarks).
 
