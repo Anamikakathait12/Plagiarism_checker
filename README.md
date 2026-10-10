@@ -1,7 +1,6 @@
 # PlagiarismGuard
 ---
 title: PlagiarismGuard
-emoji: 📄
 colorFrom: blue
 colorTo: indigo
 sdk: docker
