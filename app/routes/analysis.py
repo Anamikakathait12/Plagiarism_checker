@@ -4,10 +4,6 @@ import sqlite3
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_from_directory, current_app
 from flask_login import login_required, current_user
 from app.db import get_db_connection
-from app.services.text_extraction import extract_text, extract_and_sanitize_text, get_highlighted_texts
-from app.services.ai_report import generate_ai_report
-from app.services.semantic import calculate_similarity
-from app.services.internet_scan import check_internet_similarity
 
 analysis_bp = Blueprint('analysis', __name__)
 
@@ -23,6 +19,11 @@ def download(filename):
 # ─────────────────────────────────────────────
 @analysis_bp.route('/compare', methods=['POST'])
 def compare():
+    from app.services.ai_report import generate_ai_report
+    from app.services.internet_scan import check_internet_similarity
+    from app.services.semantic import calculate_similarity
+    from app.services.text_extraction import extract_text, get_highlighted_texts
+
     files     = request.files.getlist("files")
     documents = []
     filenames = []
@@ -210,6 +211,9 @@ def global_winnow_scan(new_submission_id):
 @analysis_bp.route('/scan_subject_assignments/<int:course_id>')
 @login_required
 def scan_subject_assignments(course_id):
+    from app.services.semantic import calculate_similarity
+    from app.services.text_extraction import extract_and_sanitize_text, get_highlighted_texts
+
     if current_user.role != 'teacher':
         return redirect(url_for('auth.index'))
 
@@ -286,6 +290,8 @@ def scan_subject_assignments(course_id):
 @analysis_bp.route('/inspect_global/<int:target_id>/<int:match_id>')
 @login_required
 def inspect_global(target_id, match_id):
+    from app.services.text_extraction import extract_and_sanitize_text, get_highlighted_texts
+
     if current_user.role != 'teacher':
         return redirect(url_for('auth.index'))
 

@@ -69,6 +69,7 @@
                     </label>
                     <button type="submit" class="button button-dark submit-button">Submit check <i class="bi bi-arrow-right"></i></button>
                 </form>
+                <div class="alert alert-info mt-3 mb-0" data-server-status role="status" aria-live="polite" hidden></div>
                 <div class="upload-footnote"><i class="bi bi-lock"></i> Your documents are handled securely</div>
             </div>
             <a class="hero-scroll" href="#features"><span></span> SCROLL TO EXPLORE</a>
@@ -341,5 +342,6 @@
     </script>
     {% endif %}
 
+    <script src="{{ url_for('static', filename='server-status.js') }}" defer></script>
 </body>
 </html>

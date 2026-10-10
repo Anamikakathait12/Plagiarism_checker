@@ -3,8 +3,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app.db import get_db_connection
-from app.services.text_extraction import extract_and_sanitize_text
-from app.services.winnowing import generate_fingerprints
 
 student_bp = Blueprint('student', __name__)
 
@@ -49,6 +47,9 @@ def student_portal():
 @student_bp.route('/upload_assignment', methods=['POST'])
 @login_required
 def upload_assignment():
+    from app.services.text_extraction import extract_and_sanitize_text
+    from app.services.winnowing import generate_fingerprints
+
     if current_user.role != 'student':
         return redirect(url_for('auth.index'))
 

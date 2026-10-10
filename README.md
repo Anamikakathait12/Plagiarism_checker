@@ -114,6 +114,22 @@ python scripts/algorithm_comparison.py
 - Uploaded documents and the database are stored in `instance/` and are never committed.
 - Accepted upload types: PDF, DOCX, TXT.
 
+## Deploying on Render
+
+The repository includes [`render.yaml`](./render.yaml), which installs the lightweight Render dependency set, starts the Flask app with Gunicorn, and configures `/health` as the service health check. The start command does not run a separate migration step. SQLite tables and schema upgrades are initialized on the first database-backed request, with short retries if SQLite is temporarily unavailable; `/health` never touches the database.
+
+### Keeping a free instance warm
+
+Render free web services can spin down after 15 minutes without inbound traffic. To reduce cold starts, configure an external uptime monitor such as UptimeRobot or cron-job.org:
+
+1. Create an HTTP/HTTPS monitor for `https://<your-render-service>.onrender.com/health`.
+2. Set its check interval to 5 minutes (or another interval under 15 minutes).
+3. Confirm the monitor reports HTTP 200.
+
+The frontend also requests `/health` when a page loads and retries transient errors or timeouts with exponential backoff. The upload form displays a waking-up message while the scan request is being submitted. The current app uses server-rendered forms rather than JSON API requests, so only safe GET/HEAD requests are automatically retried; scan POSTs are not replayed because doing so could repeat a costly analysis.
+
+A periodic external ping is a mitigation, not a guaranteed replacement for an always-on instance. For no spin-down, change `plan: free` to `plan: starter` (or a higher paid plan) in `render.yaml`, or select a paid instance type in the Render dashboard, then redeploy. Paid instance types do not spin down due to inactivity.
+
 ## License
 
 MIT

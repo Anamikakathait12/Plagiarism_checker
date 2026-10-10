@@ -1,5 +1,3 @@
-from sklearn.metrics.pairwise import cosine_similarity
-
 _model = None
 _use_embeddings = None
 
@@ -27,6 +25,8 @@ def calculate_similarity(documents):
     """
     if not documents:
         return []
+
+    from sklearn.metrics.pairwise import cosine_similarity
 
     model = _get_model()
     if model is not None:

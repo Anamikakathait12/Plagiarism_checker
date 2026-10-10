@@ -1,14 +1,43 @@
+import logging
 import sqlite3
+import time
+from threading import Lock
+
 from flask import current_app
 from werkzeug.security import generate_password_hash
 
+logger = logging.getLogger(__name__)
+_DB_INIT_LOCK = Lock()
 
-def get_db_connection():
-    conn = sqlite3.connect(current_app.config["DATABASE"])
+
+def _open_db_connection(database):
+    conn = sqlite3.connect(database, timeout=5)
     conn.row_factory = sqlite3.Row
-    # Enforce foreign key constraints (required for the fingerprints table)
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+def get_db_connection():
+    if not current_app.extensions.get("plagiarism_db_initialized"):
+        with _DB_INIT_LOCK:
+            if not current_app.extensions.get("plagiarism_db_initialized"):
+                for attempt in range(3):
+                    try:
+                        init_db()
+                        current_app.extensions["plagiarism_db_initialized"] = True
+                        break
+                    except sqlite3.OperationalError:
+                        if attempt == 2:
+                            logger.exception("Unable to initialize the application database.")
+                            raise
+                        logger.warning(
+                            "Temporary database initialization failure; retrying (%s/3).",
+                            attempt + 1,
+                            exc_info=True,
+                        )
+                        time.sleep(0.1 * (2 ** attempt))
+
+    return _open_db_connection(current_app.config["DATABASE"])
 
 
 def _add_column_if_missing(conn, table, column, definition):
@@ -18,29 +47,29 @@ def _add_column_if_missing(conn, table, column, definition):
 
 
 def init_db():
-    """Create all tables, and upgrade databases created by older versions."""
-    conn = get_db_connection()
+    """Create tables and apply schema upgrades on first database use."""
+    conn = _open_db_connection(current_app.config["DATABASE"])
 
-    conn.execute("""CREATE TABLE IF NOT EXISTS users (
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
                     email TEXT UNIQUE NOT NULL,
                     password TEXT NOT NULL,
                     role TEXT NOT NULL)""")
 
-    conn.execute("""CREATE TABLE IF NOT EXISTS courses (
+        conn.execute("""CREATE TABLE IF NOT EXISTS courses (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     code TEXT UNIQUE NOT NULL,
                     teacher_id INTEGER NOT NULL)""")
 
-    # Links students to courses
-    conn.execute("""CREATE TABLE IF NOT EXISTS enrollments (
+        conn.execute("""CREATE TABLE IF NOT EXISTS enrollments (
                     student_id INTEGER,
                     course_id INTEGER,
                     PRIMARY KEY (student_id, course_id))""")
 
-    conn.execute("""CREATE TABLE IF NOT EXISTS tasks (
+        conn.execute("""CREATE TABLE IF NOT EXISTS tasks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     course_id INTEGER,
                     title TEXT,
@@ -48,7 +77,7 @@ def init_db():
                     total_marks INTEGER DEFAULT 100,
                     FOREIGN KEY(course_id) REFERENCES courses(id))""")
 
-    conn.execute("""CREATE TABLE IF NOT EXISTS assignments (
+        conn.execute("""CREATE TABLE IF NOT EXISTS assignments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     student_id INTEGER NOT NULL,
                     course_id INTEGER,
@@ -58,20 +87,19 @@ def init_db():
                     marks INTEGER,
                     comments TEXT)""")
 
-    # Winnowing fingerprints used for the global (cross-submission) scan
-    conn.execute("""CREATE TABLE IF NOT EXISTS document_fingerprints (
+        conn.execute("""CREATE TABLE IF NOT EXISTS document_fingerprints (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     assignment_id INTEGER NOT NULL,
                     hash_value INTEGER NOT NULL,
                     FOREIGN KEY(assignment_id) REFERENCES assignments(id) ON DELETE CASCADE)""")
 
-    # Upgrades for databases created by earlier versions of the app
-    _add_column_if_missing(conn, "assignments", "course_id", "INTEGER")
-    _add_column_if_missing(conn, "assignments", "task_id", "INTEGER")
-    _add_column_if_missing(conn, "tasks", "total_marks", "INTEGER DEFAULT 100")
+        _add_column_if_missing(conn, "assignments", "course_id", "INTEGER")
+        _add_column_if_missing(conn, "assignments", "task_id", "INTEGER")
+        _add_column_if_missing(conn, "tasks", "total_marks", "INTEGER DEFAULT 100")
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def register_user(username, email, password, role):

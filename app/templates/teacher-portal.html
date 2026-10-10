@@ -437,6 +437,7 @@
                 <button type="submit" class="btn btn-gradient btn-lg w-100 py-3 shadow"><i class="bi bi-cpu me-2"></i>
                     Run Plagiarism Scan</button>
             </form>
+            <div class="alert alert-info mt-3 mb-0" data-server-status role="status" aria-live="polite" hidden></div>
         </div>
 
     
@@ -672,6 +673,7 @@
             }
         }
     </script>
+    <script src="{{ url_for('static', filename='server-status.js') }}" defer></script>
 </body>
 
 </html>

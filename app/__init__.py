@@ -2,7 +2,6 @@ import os
 from flask import Flask
 from app.config import Config
 from app.extensions import login_manager
-from app.db import init_db
 
 
 def create_app(config_class=Config):
@@ -14,8 +13,9 @@ def create_app(config_class=Config):
 
     login_manager.init_app(app)
 
-    with app.app_context():
-        init_db()
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}, 200
 
     from app import models  # noqa: F401  (registers the user_loader)
     from app.routes import register_blueprints
