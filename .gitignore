@@ -7,6 +7,7 @@ instance/*
 !instance/uploads/
 instance/uploads/*
 !instance/uploads/.gitkeep
+
 *.db
 
 # Python
@@ -19,3 +20,8 @@ __pycache__/
 .DS_Store
 .vscode/
 .idea/
+
+# Benchmark test documents (private, not for GitHub)
+scripts/benchmark_docs/*
+!scripts/benchmark_docs/README.md
+scripts/benchmark_results.csv

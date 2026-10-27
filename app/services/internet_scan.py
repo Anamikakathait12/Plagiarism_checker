@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import os
 import re
+import logging
 import requests
+import time
 from bs4 import BeautifulSoup
 from collections import Counter
 from difflib import SequenceMatcher
+from flask import current_app, has_app_context
 from typing import Any, Dict, List
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────
@@ -31,6 +36,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def _tavily_key() -> str:
+    if has_app_context():
+        return current_app.config.get("TAVILY_API_KEY", "") or os.getenv("TAVILY_API_KEY", "")
     return os.getenv("TAVILY_API_KEY", "")
 
 # ─────────────────────────────────────────────
@@ -126,7 +133,7 @@ def _fetch_via_tavily_extract(urls: List[str]) -> Dict[str, str]:
     return {}
 
 
-def _fetch_page_text(url: str) -> str:
+def _fetch_page_text_with_status(url: str) -> tuple[str, str]:
     """
     Fetch a single URL using direct HTTP.
     Falls back gracefully — Tavily extract is preferred (called in batch).
@@ -145,17 +152,33 @@ def _fetch_page_text(url: str) -> str:
             main = soup.find("main") or soup.find("article") or soup.find(id="content") or soup
             text = main.get_text(separator=" ", strip=True)
             if len(text) > 300:
-                return text
+                return text, "ok"
+            return "", "empty"
+        if res.status_code == 200:
+            return "", "empty"
+        if res.status_code == 403:
+            return "", "403"
+        return "", "failed"
+    except requests.exceptions.Timeout as e:
+        print(f"  ⚠️  Could not fetch {url}: {e}")
+        return "", "timeout"
     except Exception as e:
         print(f"  ⚠️  Could not fetch {url}: {e}")
-    return ""
+        return "", "failed"
+
+
+def _fetch_page_text(url: str) -> str:
+    """Compatibility wrapper returning only the extracted page text."""
+    text, _ = _fetch_page_text_with_status(url)
+    return text
 
 
 # ═════════════════════════════════════════════
 #  MULTI-SIGNAL SCORER
 # ═════════════════════════════════════════════
 
-def _score_against_page(student_text: str, page_text: str) -> float:
+def _score_against_page(student_text: str, page_text: str,
+                        metrics: Dict[str, Any] | None = None) -> float:
     """
     4-signal calibrated similarity score (returns 0-1):
       1. Overall sequence match         (25%)
@@ -192,6 +215,8 @@ def _score_against_page(student_text: str, page_text: str) -> float:
     best_sent = 0.0
     for sentence in _sentences(student_text)[:10]:          # cap for speed
         for passage in _passages(page_text, window=60, step=30)[:20]:
+            if metrics is not None:
+                metrics["sliding_window_chunks_compared"] += 1
             sc      = _similarity(sentence, passage)
             sw      = set(_keywords(sentence))
             pw      = set(_keywords(passage))
@@ -215,7 +240,8 @@ def _score_against_page(student_text: str, page_text: str) -> float:
 # ═════════════════════════════════════════════
 
 def _sentence_level_matches(student_text: str,
-                             snippets: List[Dict]) -> List[Dict[str, Any]]:
+                             snippets: List[Dict],
+                             metrics: Dict[str, Any] | None = None) -> List[Dict[str, Any]]:
     """
     For each sentence in the student's text, find the best matching
     passage across all fetched sources. Returns top 8 suspicious sentences.
@@ -228,6 +254,8 @@ def _sentence_level_matches(student_text: str,
             if not ref:
                 continue
             for passage in _passages(ref, window=80, step=40):
+                if metrics is not None:
+                    metrics["sliding_window_chunks_compared"] += 1
                 sc      = _similarity(sentence, passage)
                 sw      = set(_keywords(sentence))
                 pw      = set(_keywords(passage))
@@ -283,20 +311,53 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
         'icon':        str,     ← emoji
     }
     """
+    scan_started = time.perf_counter()
+    metrics: Dict[str, Any] = {
+        "total_scan_seconds": 0.0,
+        "document_word_count": 0,
+        "search_queries_fired": 0,
+        "unique_urls_returned": 0,
+        "pages_fetched_ok": 0,
+        "pages_blocked_or_failed": 0,
+        "pages_403": 0,
+        "pages_timeout": 0,
+        "pages_empty": 0,
+        "pages_other_failed": 0,
+        "sources_scored": 0,
+        "query_build_seconds": 0.0,
+        "tavily_search_seconds": 0.0,
+        "page_fetch_seconds": 0.0,
+        "scoring_seconds": 0.0,
+        "sliding_window_chunks_compared": 0,
+    }
+
+    def finish(result: Dict[str, Any]) -> Dict[str, Any]:
+        metrics["total_scan_seconds"] = round(time.perf_counter() - scan_started, 6)
+        for key in (
+            "query_build_seconds", "tavily_search_seconds",
+            "page_fetch_seconds", "scoring_seconds",
+        ):
+            metrics[key] = round(metrics[key], 6)
+        result["metrics"] = dict(metrics)
+        logger.info("Internet scan metrics: %s", result["metrics"])
+        return result
+
     print(" 🔬  Running advanced plagiarism scan...")
 
     clean_text = re.sub(r'\s+', ' ', text).strip()
+    metrics["document_word_count"] = len(clean_text.split())
 
-    if len(clean_text.split()) < 10:
-        return {
+    if metrics["document_word_count"] < 10:
+        return finish({
             'matches': [], 'sentence_matches': [],
             'overall_pct': 0.0,
             'verdict': 'Text Too Short',
             'level': 'caution', 'icon': '⚠️',
-        }
+        })
 
     # ── Detect embedded source domains in the text ────────
     # Catches GFG/Wikipedia links embedded directly in the docx content
+    query_build_started = time.perf_counter()
     url_domains = re.findall(
         r'https?://(?:www\.)?([a-zA-Z0-9.-]+\.[a-z]{2,})', clean_text
     )
@@ -339,13 +400,16 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
     # Fallback if nothing was built
     if not queries:
         queries.append('"' + ' '.join(clean_text.split()[:20]) + '"')
+    metrics["query_build_seconds"] = time.perf_counter() - query_build_started
 
     # ── Call Tavily for each query, deduplicate results ────
     tavily_results = []
     seen_urls: set = set()
 
+    search_started = time.perf_counter()
     for query in queries:
         print(f" 👉  Query: {query}")
+        metrics["search_queries_fired"] += 1
         try:
             res = requests.post("https://api.tavily.com/search", json={
                 "api_key": _tavily_key(),
@@ -360,14 +424,16 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
                     tavily_results.append(r)
         except Exception as e:
             print(f"  ❌  Tavily error on query '{query}': {e}")
+    metrics["tavily_search_seconds"] = time.perf_counter() - search_started
+    metrics["unique_urls_returned"] = len(seen_urls)
 
     if not tavily_results:
-        return {
+        return finish({
             'matches': [], 'sentence_matches': [],
             'overall_pct': 0.0,
             'verdict': 'No Match Found',
             'level': 'safe', 'icon': '🟢',
-        }
+        })
 
     # ── Extract URLs directly embedded in the student text ──
     embedded_urls = re.findall(
@@ -397,7 +463,9 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
 
     # ── Batch-fetch page content via Tavily Extract ──────
     all_urls = [r.get("url","") for r in tavily_results if r.get("url")]
+    fetch_started = time.perf_counter()
     tavily_extracted = _fetch_via_tavily_extract(all_urls)
+    metrics["page_fetch_seconds"] += time.perf_counter() - fetch_started
     print(f"  ✅  Tavily Extract got content for {len(tavily_extracted)}/{len(all_urls)} URLs")
 
     # ── Score each result ──────────────────────────────────
@@ -413,7 +481,25 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
             continue
 
         # Priority: Tavily Extract > direct HTTP > snippet
-        fetched = tavily_extracted.get(url) or _fetch_page_text(url)
+        fetched = tavily_extracted.get(url, "")
+        if fetched:
+            metrics["pages_fetched_ok"] += 1
+        else:
+            fetch_started = time.perf_counter()
+            fetched, fetch_status = _fetch_page_text_with_status(url)
+            metrics["page_fetch_seconds"] += time.perf_counter() - fetch_started
+            if fetched:
+                metrics["pages_fetched_ok"] += 1
+            else:
+                metrics["pages_blocked_or_failed"] += 1
+                if fetch_status == "403":
+                    metrics["pages_403"] += 1
+                elif fetch_status == "timeout":
+                    metrics["pages_timeout"] += 1
+                elif fetch_status == "empty":
+                    metrics["pages_empty"] += 1
+                else:
+                    metrics["pages_other_failed"] += 1
 
         # If fetch was blocked, use Tavily snippet as reference text.
         # Also strip embedded markdown URLs from student text before scoring
@@ -429,7 +515,13 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
         else:
             reference = snippet or ""
 
-        pct = round(_score_against_page(student_clean, reference) * 100, 1) if reference else 0.0
+        if reference:
+            metrics["sources_scored"] += 1
+            score_started = time.perf_counter()
+            pct = round(_score_against_page(student_clean, reference, metrics) * 100, 1)
+            metrics["scoring_seconds"] += time.perf_counter() - score_started
+        else:
+            pct = 0.0
 
         # Boost score for embedded URLs: if this URL was directly in the
         # student text, it is a near-certain source — apply a minimum floor.
@@ -462,7 +554,9 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
     overall    = round(sum(top_scores) / len(top_scores), 1) if top_scores else 0.0
 
     # ── Sentence-level breakdown ───────────────────────────
-    sent_matches = _sentence_level_matches(clean_text, snippets)
+    score_started = time.perf_counter()
+    sent_matches = _sentence_level_matches(clean_text, snippets, metrics)
+    metrics["scoring_seconds"] += time.perf_counter() - score_started
 
     # ── Verdict ───────────────────────────────────────────
     verdict, level, icon = 'No Match Found', 'safe', '🟢'
@@ -471,11 +565,11 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
             verdict, level, icon = lbl, lv, ic
             break
 
-    return {
+    return finish({
         'matches':          matches,
         'sentence_matches': sent_matches,
         'overall_pct':      overall,
         'verdict':          verdict,
         'level':            level,
         'icon':             icon,
-    }
+    })

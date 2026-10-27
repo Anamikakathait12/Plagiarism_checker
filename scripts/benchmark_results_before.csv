@@ -1,0 +1,9 @@
+filename,words,scan_seconds,queries,urls_found,pages_fetched_ok,pages_blocked,sources_scored,overall_pct
+copied_1.docx,333,45.329704,4,18,12,6,18,33.6
+copied_2.txt,332,47.417007,4,18,13,5,18,32.0
+copied_3.pdf,334,44.132208,4,18,15,3,18,33.0
+original_1.txt,332,43.723395,4,20,11,9,20,26.7
+original_2.docx,320,39.808888,4,20,15,5,20,23.7
+original_3.pdf,301,,,,,,,
+partly_copied_1.docx,316,,,,,,,
+partly_copied_2.pdf,312,,,,,,,

@@ -1,74 +1,264 @@
+"""Measure real internet-scan and offline comparison performance."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import sys
 import time
-import difflib
-import hashlib
-import matplotlib.pyplot as plt
+from pathlib import Path
+from typing import Any, Iterable
 
-# 1. Simulate a dummy student essay (approx 300 words)
-dummy_text = "The quick brown fox jumps over the lazy dog. " * 30 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-def simulate_peer_to_peer_scan(num_students):
-    """Simulates the N*(N-1)/2 comparisons using Gestalt Pattern Matching O(N^2)."""
-    comparisons = 0
-    for i in range(num_students):
-        for j in range(i + 1, num_students):
-            matcher = difflib.SequenceMatcher(None, dummy_text, dummy_text)
-            ratio = matcher.ratio()
-            comparisons += 1
-    return comparisons
+from werkzeug.datastructures import FileStorage
 
-def simulate_global_scan(num_students):
-    """Simulates Winnowing fingerprint generation and O(1) DB lookup per student."""
-    db_lookups = 0
-    # Simulating a massive database of existing historical hashes
-    dummy_db_hashes = set(range(10000))
-    
-    for i in range(num_students):
-        # Simulate slicing into K-grams and generating cryptographic hashes
-        kgrams = [dummy_text[k:k+5] for k in range(len(dummy_text)-4)]
-        hashes = set(int(hashlib.md5(kg.encode('utf-8')).hexdigest(), 16) % 20000 for kg in kgrams)
-        
-        # Simulate the O(1) mathematical intersection against the SQL database
-        intersection = hashes.intersection(dummy_db_hashes)
-        db_lookups += 1
-        
-    return db_lookups
+from app import create_app
+from app.db import get_db_connection
+from app.services.internet_scan import check_internet_similarity
+from app.services.semantic import calculate_similarity
+from app.services.text_extraction import extract_text
+from app.services.winnowing import generate_fingerprints
 
-# 2. The Benchmark Algorithm
-student_batch_sizes = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-gestalt_times = []
-winnowing_times = []
+BENCHMARK_DOCS = Path(__file__).resolve().parent / "benchmark_docs"
+RESULTS_CSV = Path(__file__).resolve().parent / "benchmark_results.csv"
+CSV_FIELDS = [
+    "filename", "words", "scan_seconds", "queries", "urls_found",
+    "pages_fetched_ok", "pages_blocked", "sources_scored", "overall_pct",
+]
+SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
-print("Running Dual-Layer Time Complexity Benchmark...")
 
-for N in student_batch_sizes:
-    # 1. Benchmark Peer-to-Peer (Gestalt)
-    start_time = time.time()
-    simulate_peer_to_peer_scan(N)
-    gestalt_times.append(time.time() - start_time)
-    
-    # 2. Benchmark Global Scan (Winnowing)
-    start_time = time.time()
-    simulate_global_scan(N)
-    winnowing_times.append(time.time() - start_time)
-    
-    print(f"Batch Size (N={N}) Processed.")
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return number
 
-# 3. Plotting the Results
-plt.figure(figsize=(10, 6))
 
-# Plot both lines to show the contrast in efficiency
-plt.plot(student_batch_sizes, gestalt_times, marker='o', linestyle='-', color='#dc3545', linewidth=2.5, label='Gestalt Peer-to-Peer $O(N^2)$')
-plt.plot(student_batch_sizes, winnowing_times, marker='s', linestyle='-', color='#0d6efd', linewidth=2.5, label='Winnowing Global Scan $O(N)$')
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--max-docs",
+        type=_positive_int,
+        help="Limit internet scans to the first N documents (offline tests still use all documents).",
+    )
+    parser.add_argument(
+        "--skip-internet",
+        action="store_true",
+        help="Skip Tavily scans and run only offline benchmarks.",
+    )
+    return parser.parse_args()
 
-# Formatting the graph for the research paper
-plt.title('Time Complexity: Peer-to-Peer vs. Global Database Scan', fontweight='bold', fontsize=14)
-plt.xlabel('Number of Student Documents Uploaded (N)', fontweight='bold')
-plt.ylabel('Execution Time (Seconds)', fontweight='bold')
-plt.grid(True, linestyle='--', alpha=0.7)
-plt.legend(fontsize=12)
 
-# Save the graph as a picture for your research paper!
-plt.tight_layout()
-plt.savefig("docs/benchmarks/time-complexity.png", dpi=300)
-print("✅ Success: Graph saved as updated_time_complexity_graph.png")
-plt.show()
+def _load_documents() -> list[tuple[Path, str]]:
+    if not BENCHMARK_DOCS.is_dir():
+        raise FileNotFoundError(f"Document folder does not exist: {BENCHMARK_DOCS}")
+
+    paths = sorted(
+        path for path in BENCHMARK_DOCS.iterdir()
+        if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS
+    )
+    if not paths:
+        raise FileNotFoundError(
+            f"No PDF, DOCX, or TXT documents found in {BENCHMARK_DOCS}"
+        )
+
+    documents = []
+    for path in paths:
+        with path.open("rb") as stream:
+            uploaded_file = FileStorage(stream=stream, filename=path.name)
+            text = extract_text(uploaded_file)
+        documents.append((path, text))
+    return documents
+
+
+def _print_table(headers: list[str], rows: Iterable[Iterable[Any]]) -> None:
+    rows = [[str(value) for value in row] for row in rows]
+    widths = [
+        max(len(header), *(len(row[index]) for row in rows))
+        for index, header in enumerate(headers)
+    ]
+    print(" | ".join(header.ljust(widths[index]) for index, header in enumerate(headers)))
+    print("-+-".join("-" * width for width in widths))
+    for row in rows:
+        print(" | ".join(value.ljust(widths[index]) for index, value in enumerate(row)))
+
+
+def _benchmark_peer_comparisons(documents: list[tuple[Path, str]]) -> None:
+    print("\nPeer-to-peer semantic comparison (warm-up excluded; matrix + pair scores):")
+    rows = []
+    texts = [text for _, text in documents]
+    calculate_similarity(texts[:2])
+    for count in (2, 5, 10):
+        # Repeat the loaded corpus when fewer than N documents are available.
+        batch = [texts[index % len(texts)] for index in range(count)]
+        started = time.perf_counter()
+        matrix = calculate_similarity(batch)
+        pair_count = 0
+        for first in range(count):
+            for second in range(first + 1, count):
+                _ = float(matrix[first][second] * 100)
+                pair_count += 1
+        elapsed = time.perf_counter() - started
+        rows.append((count, pair_count, f"{elapsed:.6f}"))
+    _print_table(["documents", "pairs", "seconds"], rows)
+
+
+def _benchmark_fingerprints(documents: list[tuple[Path, str]]) -> None:
+    print("\nWinnowing fingerprint generation:")
+    rows = []
+    for path, text in documents:
+        started = time.perf_counter()
+        fingerprints = generate_fingerprints(text)
+        elapsed = time.perf_counter() - started
+        rows.append((path.name, len(fingerprints), f"{elapsed:.6f}"))
+    _print_table(["filename", "fingerprints", "seconds"], rows)
+
+
+def _benchmark_global_scan() -> None:
+    connection = get_db_connection()
+    try:
+        target = connection.execute(
+            "SELECT assignment_id FROM document_fingerprints "
+            "GROUP BY assignment_id ORDER BY assignment_id LIMIT 1"
+        ).fetchone()
+        if target is None:
+            print("\nGlobal Winnowing scan: skipped (no stored fingerprints in the database).")
+            return
+
+        target_id = target["assignment_id"]
+        target_hashes = {
+            row["hash_value"]
+            for row in connection.execute(
+                "SELECT hash_value FROM document_fingerprints WHERE assignment_id = ?",
+                (target_id,),
+            )
+        }
+        if not target_hashes:
+            print("\nGlobal Winnowing scan: skipped (no target fingerprints were found).")
+            return
+
+        placeholders = ",".join("?" for _ in target_hashes)
+        query = f"""
+            SELECT df.assignment_id AS matched_doc_id,
+                   COUNT(df.hash_value) AS shared_count,
+                   a.filename AS match_filename,
+                   COALESCE(u.username, 'Unknown') AS match_student,
+                   COALESCE(c.name, 'No Course') AS match_course,
+                   a.course_id AS match_course_id
+            FROM document_fingerprints df
+            JOIN assignments a ON a.id = df.assignment_id
+            LEFT JOIN users u ON u.id = a.student_id
+            LEFT JOIN courses c ON c.id = a.course_id
+            WHERE df.hash_value IN ({placeholders})
+              AND df.assignment_id != ?
+            GROUP BY df.assignment_id
+            HAVING shared_count > 0
+            ORDER BY shared_count DESC
+        """
+        started = time.perf_counter()
+        matches = connection.execute(
+            query, list(target_hashes) + [target_id]
+        ).fetchall()
+        elapsed = time.perf_counter() - started
+        print(
+            "\nGlobal Winnowing scan: "
+            f"{elapsed:.6f} seconds, {len(matches)} matching documents "
+            f"(using stored assignment {target_id})."
+        )
+    finally:
+        connection.close()
+
+
+def main() -> int:
+    args = _parse_args()
+    documents = _load_documents()
+    words_by_doc = [len(text.split()) for _, text in documents]
+    scan_limit = len(documents) if args.max_docs is None else min(args.max_docs, len(documents))
+    app = create_app()
+    csv_rows = []
+    scan_metrics = []
+
+    with app.app_context():
+        if not args.skip_internet and not app.config.get("TAVILY_API_KEY"):
+            raise RuntimeError(
+                "TAVILY_API_KEY is not configured. Set it in .env/environment "
+                "or use --skip-internet."
+            )
+
+        print(f"Loaded {len(documents)} document(s) from {BENCHMARK_DOCS}.")
+        if args.skip_internet:
+            print("Internet scans skipped; running offline benchmarks only.")
+        elif scan_limit:
+            # Each internet scan uses Tavily credits.
+            print(f"Running {scan_limit} internet scan(s); each uses Tavily credits.")
+
+        for index, (path, text) in enumerate(documents):
+            row: dict[str, Any] = {
+                "filename": path.name,
+                "words": words_by_doc[index],
+                "scan_seconds": "",
+                "queries": "",
+                "urls_found": "",
+                "pages_fetched_ok": "",
+                "pages_blocked": "",
+                "sources_scored": "",
+                "overall_pct": "",
+            }
+            if not args.skip_internet and index < scan_limit:
+                result = check_internet_similarity(text)
+                metrics = result["metrics"]
+                scan_metrics.append(metrics)
+                row.update({
+                    "scan_seconds": metrics["total_scan_seconds"],
+                    "queries": metrics["search_queries_fired"],
+                    "urls_found": metrics["unique_urls_returned"],
+                    "pages_fetched_ok": metrics["pages_fetched_ok"],
+                    "pages_blocked": metrics["pages_blocked_or_failed"],
+                    "sources_scored": metrics["sources_scored"],
+                    "overall_pct": result["overall_pct"],
+                })
+            csv_rows.append(row)
+
+        print("\nPer-document internet scan results:")
+        _print_table(
+            CSV_FIELDS,
+            [[row[field] for field in CSV_FIELDS] for row in csv_rows],
+        )
+        _benchmark_peer_comparisons(documents)
+        _benchmark_fingerprints(documents)
+        _benchmark_global_scan()
+
+    with RESULTS_CSV.open("w", newline="", encoding="utf-8") as output:
+        writer = csv.DictWriter(output, fieldnames=CSV_FIELDS)
+        writer.writeheader()
+        writer.writerows(csv_rows)
+
+    print(f"\nInternet scan results saved to {RESULTS_CSV}.")
+    print("\nSummary:")
+    print(f"  Average words per document: {sum(words_by_doc) / len(words_by_doc):.1f}")
+    print(f"  Total documents tested: {len(documents)}")
+    if scan_metrics:
+        scan_times = [metric["total_scan_seconds"] for metric in scan_metrics]
+        sources = [metric["sources_scored"] for metric in scan_metrics]
+        pages_ok = sum(metric["pages_fetched_ok"] for metric in scan_metrics)
+        pages_failed = sum(metric["pages_blocked_or_failed"] for metric in scan_metrics)
+        fetch_total = pages_ok + pages_failed
+        success_rate = f"{pages_ok / fetch_total * 100:.1f}%" if fetch_total else "n/a"
+        print(
+            f"  Scan time (average / min / max): "
+            f"{sum(scan_times) / len(scan_times):.6f} / "
+            f"{min(scan_times):.6f} / {max(scan_times):.6f} seconds"
+        )
+        print(f"  Average sources scored: {sum(sources) / len(sources):.1f}")
+        print(f"  Page fetch success rate: {success_rate}")
+        print(f"  Internet scans completed: {len(scan_metrics)}")
+    else:
+        print("  Internet scan statistics: unavailable (internet scans were skipped).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
