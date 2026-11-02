@@ -87,7 +87,7 @@ def compare():
             scan = check_internet_similarity(doc_text)
             internet_results[filename] = scan
             ai_report, ai_report_unavailable = generate_ai_report(
-                doc_text, [m['url'] for m in scan.get('matches', [])]
+                doc_text, scan
             )
             if not scan['matches']:
                 ai_report = f"✅ No internet matches found for '{filename}'."

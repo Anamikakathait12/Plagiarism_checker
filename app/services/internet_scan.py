@@ -5,14 +5,75 @@ import re
 import logging
 import requests
 import time
+from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from collections import Counter
 from difflib import SequenceMatcher
 from flask import current_app, has_app_context
 from typing import Any, Dict, List
 from dotenv import load_dotenv
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
+
+# Sequence similarity keeps a quarter of the raw source score.
+SEQUENCE_WEIGHT = 0.25
+# Keyword overlap is reduced because shared topics can match without copying.
+KEYWORD_WEIGHT = 0.10
+# Three-gram overlap rewards exact reuse of short phrases.
+NGRAM_3_WEIGHT = 0.25
+# Five-gram overlap gives stronger weight to longer exact phrase reuse.
+NGRAM_5_WEIGHT = 0.25
+# Sentence-level matching retains its existing contribution.
+BEST_SENTENCE_WEIGHT = 0.15
+# Small common-content baseline removed before score calibration.
+BASELINE = 0.08
+# The best source contributes 60% of the overall score.
+OVERALL_TOP_SOURCE_WEIGHT = 0.60
+# The average of up to three best sources contributes 40%.
+OVERALL_TOP3_AVERAGE_WEIGHT = 0.40
+# Sentence keyword overlap keeps its existing 0.8 multiplier.
+SENTENCE_OVERLAP_WEIGHT = 0.80
+# Sentence matches require this minimum combined similarity.
+SENTENCE_MATCH_THRESHOLD = 0.25
+# Calibration's lower transition point remains 0.3.
+CALIBRATION_LOW_CUTOFF = 0.30
+# Calibration's upper transition point remains 0.6.
+CALIBRATION_HIGH_CUTOFF = 0.60
+# Scores below the lower transition retain the existing scale.
+CALIBRATION_LOW_SCALE = 1.20
+# Calibration's middle segment retains its existing starting value.
+CALIBRATION_MIDDLE_BASE = 0.36
+# Calibration's middle segment retains its existing scale.
+CALIBRATION_MIDDLE_SCALE = 1.50
+# Calibration's upper segment retains its existing starting value.
+CALIBRATION_UPPER_BASE = 0.81
+# Calibration's upper segment retains its existing scale.
+CALIBRATION_UPPER_SCALE = 0.95
+# Source and page prefixes remain capped at 3,000 characters for scoring.
+SCORE_TEXT_CHAR_LIMIT = 3000
+# Source scoring compares at most ten student sentences.
+SCORE_SENTENCE_LIMIT = 10
+# Source scoring uses 60-word passages.
+SCORE_PASSAGE_WINDOW_WORDS = 60
+# Source-scoring passages advance 30 words at a time.
+SCORE_PASSAGE_STEP_WORDS = 30
+# Source scoring compares at most twenty passages per sentence.
+SCORE_MAX_PASSAGES = 20
+# Sentence-level matching uses 80-word passages.
+SENTENCE_PASSAGE_WINDOW_WORDS = 80
+# Sentence-level passage windows advance 40 words at a time.
+SENTENCE_PASSAGE_STEP_WORDS = 40
+# Embedded source URLs retain their existing minimum score floor.
+EMBEDDED_URL_SCORE_FLOOR = 30.0
+# A single source at or above this score triggers the high-plagiarism verdict.
+HIGH_SOURCE_VERDICT_THRESHOLD = 60.0
+
+# Low-value social pages are not fetched or scored.
+DOMAIN_BLOCKLIST = frozenset({
+    "facebook.com", "instagram.com", "youtube.com", "tiktok.com",
+    "twitter.com", "x.com", "pinterest.com", "linkedin.com",
+})
 
 
 # ─────────────────────────────────────────────
@@ -98,9 +159,17 @@ def _calibrate(score: float) -> float:
     """
     if score <= 0:   return 0.0
     if score >= 1:   return 1.0
-    if score < 0.3:  return score * 1.2
-    if score < 0.6:  return 0.36 + (score - 0.3) * 1.5
-    return min(1.0,  0.81 + (score - 0.6) * 0.95)
+    if score < CALIBRATION_LOW_CUTOFF:
+        return score * CALIBRATION_LOW_SCALE
+    if score < CALIBRATION_HIGH_CUTOFF:
+        return CALIBRATION_MIDDLE_BASE + (
+            score - CALIBRATION_LOW_CUTOFF
+        ) * CALIBRATION_MIDDLE_SCALE
+    return min(
+        1.0,
+        CALIBRATION_UPPER_BASE
+        + (score - CALIBRATION_HIGH_CUTOFF) * CALIBRATION_UPPER_SCALE,
+    )
 
 
 # ═════════════════════════════════════════════
@@ -115,22 +184,45 @@ def _fetch_via_tavily_extract(urls: List[str]) -> Dict[str, str]:
     """
     if not urls:
         return {}
+
+    batches = [urls[index:index + 5] for index in range(0, len(urls), 5)]
+    api_key = _tavily_key()
+
+    def extract_batch(batch: List[str]) -> Dict[str, str]:
+        try:
+            res = requests.post("https://api.tavily.com/extract", json={
+                "api_key": api_key,
+                "urls": batch,  # Tavily accepts at most five URLs per request.
+            }, timeout=20)
+            if res.status_code == 200:
+                return {
+                    item.get("url", ""): item.get("raw_content", "")
+                    for item in res.json().get("results", [])
+                    if item.get("url") and item.get("raw_content")
+                }
+        except Exception as e:
+            print(f"  ⚠️  Tavily extract error: {e}")
+        return {}
+
+    with ThreadPoolExecutor(max_workers=min(8, len(batches))) as executor:
+        extracted_batches = executor.map(extract_batch, batches)
+        return {
+            url: content
+            for batch_result in extracted_batches
+            for url, content in batch_result.items()
+        }
+
+
+def _is_blocklisted_url(url: str) -> bool:
+    """Match blocked domains and their subdomains, ignoring URL ports."""
     try:
-        res = requests.post("https://api.tavily.com/extract", json={
-            "api_key": _tavily_key(),
-            "urls": urls[:5],  # max 5 per call
-        }, timeout=20)
-        if res.status_code == 200:
-            result_map = {}
-            for r in res.json().get("results", []):
-                url = r.get("url", "")
-                raw = r.get("raw_content", "")
-                if url and raw:
-                    result_map[url] = raw
-            return result_map
-    except Exception as e:
-        print(f"  ⚠️  Tavily extract error: {e}")
-    return {}
+        hostname = (urlsplit(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return False
+    return any(
+        hostname == domain or hostname.endswith("." + domain)
+        for domain in DOMAIN_BLOCKLIST
+    )
 
 
 def _fetch_page_text_with_status(url: str) -> tuple[str, str]:
@@ -138,12 +230,31 @@ def _fetch_page_text_with_status(url: str) -> tuple[str, str]:
     Fetch a single URL using direct HTTP.
     Falls back gracefully — Tavily extract is preferred (called in batch).
     """
-    try:
-        res = requests.get(url, timeout=8, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
-        }, allow_redirects=True)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    for attempt in range(2):
+        try:
+            res = requests.get(url, timeout=6, headers=headers, allow_redirects=True)
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            ConnectionResetError,
+        ) as e:
+            if attempt == 0:
+                continue
+            status = "timeout" if isinstance(e, requests.exceptions.Timeout) else "failed"
+            print(f"  ⚠️  Could not fetch {url}: {e}")
+            return "", status
+        except Exception as e:
+            print(f"  ⚠️  Could not fetch {url}: {e}")
+            return "", "failed"
+
         if res.status_code == 200 and len(res.text) > 200:
             soup = BeautifulSoup(res.text, "html.parser")
             for tag in soup(["script", "style", "nav", "footer", "header",
@@ -159,12 +270,7 @@ def _fetch_page_text_with_status(url: str) -> tuple[str, str]:
         if res.status_code == 403:
             return "", "403"
         return "", "failed"
-    except requests.exceptions.Timeout as e:
-        print(f"  ⚠️  Could not fetch {url}: {e}")
-        return "", "timeout"
-    except Exception as e:
-        print(f"  ⚠️  Could not fetch {url}: {e}")
-        return "", "failed"
+    return "", "failed"
 
 
 def _fetch_page_text(url: str) -> str:
@@ -182,16 +288,16 @@ def _score_against_page(student_text: str, page_text: str,
     """
     4-signal calibrated similarity score (returns 0-1):
       1. Overall sequence match         (25%)
-      2. Keyword overlap                (25%)
-      3. 3-gram fingerprint overlap     (20%)
-      4. 5-gram fingerprint overlap     (15%)
+      2. Keyword overlap                (10%)
+      3. 3-gram fingerprint overlap     (25%)
+      4. 5-gram fingerprint overlap     (25%)
       5. Best sentence-level match      (15%)
     """
     if not page_text.strip():
         return 0.0
 
-    src_cap = student_text[:3000].lower()
-    ref_cap = page_text[:3000].lower()
+    src_cap = student_text[:SCORE_TEXT_CHAR_LIMIT].lower()
+    ref_cap = page_text[:SCORE_TEXT_CHAR_LIMIT].lower()
 
     # Signal 1 — sequence similarity
     seq_score = SequenceMatcher(None, src_cap, ref_cap).ratio()
@@ -213,26 +319,30 @@ def _score_against_page(student_text: str, page_text: str,
 
     # Signal 5 — best sentence-level match
     best_sent = 0.0
-    for sentence in _sentences(student_text)[:10]:          # cap for speed
-        for passage in _passages(page_text, window=60, step=30)[:20]:
+    for sentence in _sentences(student_text)[:SCORE_SENTENCE_LIMIT]:
+        for passage in _passages(
+            page_text,
+            window=SCORE_PASSAGE_WINDOW_WORDS,
+            step=SCORE_PASSAGE_STEP_WORDS,
+        )[:SCORE_MAX_PASSAGES]:
             if metrics is not None:
                 metrics["sliding_window_chunks_compared"] += 1
             sc      = _similarity(sentence, passage)
             sw      = set(_keywords(sentence))
             pw      = set(_keywords(passage))
             overlap = len(sw & pw) / max(len(sw), 1) if sw else 0.0
-            combined = max(sc, overlap * 0.8)
+            combined = max(sc, overlap * SENTENCE_OVERLAP_WEIGHT)
             if combined > best_sent:
                 best_sent = combined
 
     raw = (
-        seq_score   * 0.25 +
-        kw_overlap  * 0.25 +
-        ng3         * 0.20 +
-        ng5         * 0.15 +
-        best_sent   * 0.15
+        seq_score   * SEQUENCE_WEIGHT +
+        kw_overlap  * KEYWORD_WEIGHT +
+        ng3         * NGRAM_3_WEIGHT +
+        ng5         * NGRAM_5_WEIGHT +
+        best_sent   * BEST_SENTENCE_WEIGHT
     )
-    return _calibrate(raw)
+    return _calibrate(max(0.0, raw - BASELINE))
 
 
 # ═════════════════════════════════════════════
@@ -253,20 +363,24 @@ def _sentence_level_matches(student_text: str,
             ref = snip.get('full_text') or snip.get('text', '')
             if not ref:
                 continue
-            for passage in _passages(ref, window=80, step=40):
+            for passage in _passages(
+                ref,
+                window=SENTENCE_PASSAGE_WINDOW_WORDS,
+                step=SENTENCE_PASSAGE_STEP_WORDS,
+            ):
                 if metrics is not None:
                     metrics["sliding_window_chunks_compared"] += 1
                 sc      = _similarity(sentence, passage)
                 sw      = set(_keywords(sentence))
                 pw      = set(_keywords(passage))
                 overlap = len(sw & pw) / max(len(sw), 1) if sw else 0.0
-                combined = max(sc, overlap * 0.80)
+                combined = max(sc, overlap * SENTENCE_OVERLAP_WEIGHT)
                 if combined > best_score:
                     best_score = combined
                     best_match = passage[:200]
                     best_url   = snip.get('url', '')
 
-        if best_score >= 0.25:
+        if best_score >= SENTENCE_MATCH_THRESHOLD:
             results.append({
                 'source':     sentence,
                 'matched':    best_match,
@@ -318,6 +432,9 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
         "search_queries_fired": 0,
         "unique_urls_returned": 0,
         "pages_fetched_ok": 0,
+        "pages_blocked": 0,
+        "pages_rescued_by_extract": 0,
+        "urls_skipped_blocklist": 0,
         "pages_blocked_or_failed": 0,
         "pages_403": 0,
         "pages_timeout": 0,
@@ -326,6 +443,9 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
         "sources_scored": 0,
         "query_build_seconds": 0.0,
         "tavily_search_seconds": 0.0,
+        "search_seconds": 0.0,
+        "extract_seconds": 0.0,
+        "fetch_seconds": 0.0,
         "page_fetch_seconds": 0.0,
         "scoring_seconds": 0.0,
         "sliding_window_chunks_compared": 0,
@@ -333,8 +453,10 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
 
     def finish(result: Dict[str, Any]) -> Dict[str, Any]:
         metrics["total_scan_seconds"] = round(time.perf_counter() - scan_started, 6)
+        metrics["page_fetch_seconds"] = metrics["extract_seconds"] + metrics["fetch_seconds"]
         for key in (
             "query_build_seconds", "tavily_search_seconds",
+            "search_seconds", "extract_seconds", "fetch_seconds",
             "page_fetch_seconds", "scoring_seconds",
         ):
             metrics[key] = round(metrics[key], 6)
@@ -406,25 +528,34 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
     tavily_results = []
     seen_urls: set = set()
 
-    search_started = time.perf_counter()
-    for query in queries:
-        print(f" 👉  Query: {query}")
-        metrics["search_queries_fired"] += 1
+    def search_query(query: str) -> List[Dict[str, Any]]:
         try:
             res = requests.post("https://api.tavily.com/search", json={
-                "api_key": _tavily_key(),
+                "api_key": api_key,
                 "query": query,
                 "search_depth": "advanced",
                 "max_results": 5
-            })
+            }, timeout=20)
             res.raise_for_status()
-            for r in res.json().get("results", []):
+            return res.json().get("results", [])
+        except Exception as e:
+            print(f"  ❌  Tavily error on query '{query}': {e}")
+            return []
+
+    search_started = time.perf_counter()
+    api_key = _tavily_key()
+    metrics["search_queries_fired"] = len(queries)
+    for query in queries:
+        print(f" 👉  Query: {query}")
+    # Search queries run concurrently; executor.map keeps query order stable.
+    with ThreadPoolExecutor(max_workers=len(queries)) as executor:
+        for query_results in executor.map(search_query, queries):
+            for r in query_results:
                 if r.get("url") and r["url"] not in seen_urls:
                     seen_urls.add(r["url"])
                     tavily_results.append(r)
-        except Exception as e:
-            print(f"  ❌  Tavily error on query '{query}': {e}")
     metrics["tavily_search_seconds"] = time.perf_counter() - search_started
+    metrics["search_seconds"] = metrics["tavily_search_seconds"]
     metrics["unique_urls_returned"] = len(seen_urls)
 
     if not tavily_results:
@@ -461,12 +592,30 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
             })
             print(f"  🔗  Added embedded URL for scoring: {eu}")
 
+    # Count and remove social-network URLs before either extraction or scoring.
+    allowed_results = []
+    for result in tavily_results:
+        if _is_blocklisted_url(result.get("url", "")):
+            metrics["urls_skipped_blocklist"] += 1
+        else:
+            allowed_results.append(result)
+    tavily_results = allowed_results
+
     # ── Batch-fetch page content via Tavily Extract ──────
     all_urls = [r.get("url","") for r in tavily_results if r.get("url")]
-    fetch_started = time.perf_counter()
+    extract_started = time.perf_counter()
     tavily_extracted = _fetch_via_tavily_extract(all_urls)
-    metrics["page_fetch_seconds"] += time.perf_counter() - fetch_started
+    metrics["extract_seconds"] = time.perf_counter() - extract_started
     print(f"  ✅  Tavily Extract got content for {len(tavily_extracted)}/{len(all_urls)} URLs")
+
+    # Direct HTTP fallbacks run concurrently, capped at eight workers.
+    direct_urls = [url for url in all_urls if not tavily_extracted.get(url)]
+    fetch_started = time.perf_counter()
+    with ThreadPoolExecutor(max_workers=min(8, len(direct_urls)) or 1) as executor:
+        direct_fetches = dict(zip(direct_urls, executor.map(
+            _fetch_page_text_with_status, direct_urls
+        )))
+    metrics["fetch_seconds"] = time.perf_counter() - fetch_started
 
     # ── Score each result ──────────────────────────────────
     matches:  List[Dict[str, Any]] = []
@@ -484,13 +633,13 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
         fetched = tavily_extracted.get(url, "")
         if fetched:
             metrics["pages_fetched_ok"] += 1
+            metrics["pages_rescued_by_extract"] += 1
         else:
-            fetch_started = time.perf_counter()
-            fetched, fetch_status = _fetch_page_text_with_status(url)
-            metrics["page_fetch_seconds"] += time.perf_counter() - fetch_started
+            fetched, fetch_status = direct_fetches.get(url, ("", "failed"))
             if fetched:
                 metrics["pages_fetched_ok"] += 1
             else:
+                metrics["pages_blocked"] += 1
                 metrics["pages_blocked_or_failed"] += 1
                 if fetch_status == "403":
                     metrics["pages_403"] += 1
@@ -526,8 +675,8 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
         # Boost score for embedded URLs: if this URL was directly in the
         # student text, it is a near-certain source — apply a minimum floor.
         url_in_text = url.split("?")[0].rstrip("/") 
-        if url_in_text in clean_text and pct < 30.0:
-            pct = max(pct, 30.0)
+        if url_in_text in clean_text and pct < EMBEDDED_URL_SCORE_FLOOR:
+            pct = max(pct, EMBEDDED_URL_SCORE_FLOOR)
             print(f"  🔗  {url} — embedded in text, boosted to {pct}%")
         else:
             print(f"  📊  {url} → {pct}%")
@@ -551,7 +700,15 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
     # ── Sort + overall score ───────────────────────────────
     matches.sort(key=lambda x: -x['pct'])
     top_scores = [m['pct'] for m in matches[:3]]
-    overall    = round(sum(top_scores) / len(top_scores), 1) if top_scores else 0.0
+    if top_scores:
+        top3_average = sum(top_scores) / len(top_scores)
+        overall = round(
+            top_scores[0] * OVERALL_TOP_SOURCE_WEIGHT
+            + top3_average * OVERALL_TOP3_AVERAGE_WEIGHT,
+            1,
+        )
+    else:
+        overall = 0.0
 
     # ── Sentence-level breakdown ───────────────────────────
     score_started = time.perf_counter()
@@ -560,10 +717,13 @@ def check_internet_similarity(text: str) -> Dict[str, Any]:
 
     # ── Verdict ───────────────────────────────────────────
     verdict, level, icon = 'No Match Found', 'safe', '🟢'
-    for threshold, lbl, lv, ic in THRESHOLDS:
-        if overall >= threshold:
-            verdict, level, icon = lbl, lv, ic
-            break
+    if matches and matches[0]['pct'] >= HIGH_SOURCE_VERDICT_THRESHOLD:
+        verdict, level, icon = 'High Web Plagiarism', 'danger', '🔴'
+    else:
+        for threshold, lbl, lv, ic in THRESHOLDS:
+            if overall >= threshold:
+                verdict, level, icon = lbl, lv, ic
+                break
 
     return finish({
         'matches':          matches,

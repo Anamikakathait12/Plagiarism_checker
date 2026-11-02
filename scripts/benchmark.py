@@ -240,6 +240,30 @@ def main() -> int:
     print("\nSummary:")
     print(f"  Average words per document: {sum(words_by_doc) / len(words_by_doc):.1f}")
     print(f"  Total documents tested: {len(documents)}")
+    score_groups = {"copied": [], "partly_copied": [], "original": []}
+    for row in csv_rows:
+        if row["overall_pct"] == "":
+            continue
+        filename = row["filename"].lower()
+        for group in score_groups:
+            if filename.startswith(group):
+                score_groups[group].append(float(row["overall_pct"]))
+
+    def average_score(group: str) -> str:
+        scores = score_groups[group]
+        return f"{sum(scores) / len(scores):.1f}%" if scores else "n/a"
+
+    copied_scores = score_groups["copied"]
+    original_scores = score_groups["original"]
+    gap = (
+        f"{sum(copied_scores) / len(copied_scores) - sum(original_scores) / len(original_scores):+.1f} pp"
+        if copied_scores and original_scores else "n/a"
+    )
+    print(
+        "  Average score (copied / partly_copied / original): "
+        f"{average_score('copied')} / {average_score('partly_copied')} / "
+        f"{average_score('original')}; copied-original gap: {gap}"
+    )
     if scan_metrics:
         scan_times = [metric["total_scan_seconds"] for metric in scan_metrics]
         sources = [metric["sources_scored"] for metric in scan_metrics]
